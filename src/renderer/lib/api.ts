@@ -6,12 +6,38 @@ const client = axios.create({
   timeout: 10000
 })
 
+// 添加请求拦截器用于调试
+client.interceptors.request.use(
+  (config) => {
+    console.log('[API] Request:', config.method?.toUpperCase(), config.url)
+    return config
+  },
+  (error) => {
+    console.error('[API] Request Error:', error)
+    return Promise.reject(error)
+  }
+)
+
+// 添加响应拦截器用于调试
+client.interceptors.response.use(
+  (response) => {
+    console.log('[API] Response:', response.status, response.config.url)
+    return response
+  },
+  (error) => {
+    console.error('[API] Response Error:', error.message, error.config?.url)
+    return Promise.reject(error)
+  }
+)
+
 export const api = {
   async checkHealth(): Promise<boolean> {
     try {
-      await client.get('/api/health')
+      const response = await client.get('/api/health')
+      console.log('[API] Health check success:', response.data)
       return true
-    } catch {
+    } catch (error) {
+      console.error('[API] Health check failed:', error)
       return false
     }
   },
