@@ -1,6 +1,8 @@
-import { BrowserWindow, shell } from 'electron'
+import { BrowserWindow, shell, session } from 'electron'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
+
+const BUDDY_API_ORIGIN = 'http://127.0.0.1:8765'
 
 export class WindowManager {
   private mainWindow: BrowserWindow | null = null
@@ -35,7 +37,20 @@ export class WindowManager {
       this.mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
     }
 
+    this.setupApiProxy()
+
     return this.mainWindow
+  }
+
+  private setupApiProxy(): void {
+    session.defaultSession.webRequest.onBeforeRequest(
+      { urls: ['file:///api/*'] },
+      (details, callback) => {
+        const url = new URL(details.url)
+        const redirectURL = `${BUDDY_API_ORIGIN}${url.pathname}${url.search}`
+        callback({ redirectURL })
+      }
+    )
   }
 
   getMainWindow(): BrowserWindow | null {

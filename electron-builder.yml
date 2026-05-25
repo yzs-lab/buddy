@@ -1,17 +1,15 @@
 appId: com.buddy.macos
 productName: buddy
 directories:
-  release: release
-  output: dist
+  output: release
 files:
-  - dist/**/*
   - out/**/*
 mac:
   category: public.app-category.developer-tools
   icon: build/icon.icns
   target:
-    - dmg
     - zip
+    - dir
 dmg:
   contents:
     - x: 130
