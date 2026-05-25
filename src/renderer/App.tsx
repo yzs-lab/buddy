@@ -14,8 +14,8 @@ export default function App() {
   const [selectedWorkspaceKey, setSelectedWorkspaceKey] = useState<string | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
 
-  const { data: bootstrap } = useBootstrap()
-  const { data: tasks = [] } = useTasks()
+  const { data: bootstrap, isLoading: isLoadingBootstrap, error: bootstrapError } = useBootstrap()
+  const { data: tasks = [], isLoading: isLoadingTasks, error: tasksError } = useTasks()
   const { data: taskDetail } = useTaskDetail(selectedTaskId, selectedWorkspaceKey ?? undefined)
 
   const createTask = useCreateTask()
@@ -121,6 +121,8 @@ export default function App() {
           width={sidebarWidth}
           tasks={tasks}
           selectedTaskId={selectedTaskId}
+          isLoading={isLoadingTasks}
+          error={tasksError}
           onSelectTask={handleSelectTask}
           onCreateTask={() => setShowCreateModal(true)}
           onOpenSettings={() => {/* TODO */}}
