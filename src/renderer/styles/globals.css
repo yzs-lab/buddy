@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --canvas: #f2f0eb;
+  --house-green: #1e3932;
+  --brand-green: #006241;
+  --gold: #cba258;
+  --danger: #c82014;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--canvas);
+  color: rgba(0, 0, 0, 0.87);
+}
+
+#root {
+  height: 100vh;
+  overflow: hidden;
+}
