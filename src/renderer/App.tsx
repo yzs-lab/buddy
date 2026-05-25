@@ -8,6 +8,8 @@ import { StatusBar } from './components/StatusBar'
 export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [isStatusBarOpen, setIsStatusBarOpen] = useState(true)
+  const [sidebarWidth, setSidebarWidth] = useState(240)
+  const [statusBarWidth, setStatusBarWidth] = useState(280)
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [selectedWorkspaceKey, setSelectedWorkspaceKey] = useState<string | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -92,6 +94,14 @@ export default function App() {
     })
   }, [selectedTaskId, selectedWorkspaceKey, interrupt])
 
+  const handleSidebarResize = useCallback((delta: number) => {
+    setSidebarWidth(prev => Math.max(180, Math.min(400, prev + delta)))
+  }, [])
+
+  const handleStatusBarResize = useCallback((delta: number) => {
+    setStatusBarWidth(prev => Math.max(200, Math.min(400, prev + delta)))
+  }, [])
+
   return (
     <div className="h-screen flex flex-col">
       {/* 标题栏 */}
@@ -108,11 +118,13 @@ export default function App() {
         {/* 左侧栏 */}
         <Sidebar
           isOpen={isSidebarOpen}
+          width={sidebarWidth}
           tasks={tasks}
           selectedTaskId={selectedTaskId}
           onSelectTask={handleSelectTask}
           onCreateTask={() => setShowCreateModal(true)}
           onOpenSettings={() => {/* TODO */}}
+          onResize={handleSidebarResize}
         />
 
         {/* 中间对话区域 */}
@@ -125,11 +137,13 @@ export default function App() {
         {/* 右侧状态栏 */}
         <StatusBar
           isOpen={isStatusBarOpen}
+          width={statusBarWidth}
           taskState={taskDetail?.state ?? null}
           taskSettings={taskDetail?.settings ?? null}
           onSkipCountdown={handleSkipCountdown}
           onPauseCountdown={handlePauseCountdown}
           onInterrupt={handleInterrupt}
+          onResize={handleStatusBarResize}
         />
       </div>
 

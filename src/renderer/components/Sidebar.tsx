@@ -1,21 +1,26 @@
 import { Task } from '../../shared/types'
+import { ResizeHandle } from './ResizeHandle'
 
 interface SidebarProps {
   isOpen: boolean
+  width: number
   tasks: Task[]
   selectedTaskId: string | null
   onSelectTask: (taskId: string, workspaceKey: string) => void
   onCreateTask: () => void
   onOpenSettings: () => void
+  onResize: (delta: number) => void
 }
 
 export function Sidebar({
   isOpen,
+  width,
   tasks,
   selectedTaskId,
   onSelectTask,
   onCreateTask,
-  onOpenSettings
+  onOpenSettings,
+  onResize
 }: SidebarProps) {
   if (!isOpen) return null
 
@@ -27,7 +32,8 @@ export function Sidebar({
   }, {})
 
   return (
-    <div className="w-60 bg-house-green text-white flex flex-col h-full">
+    <div className="flex h-full">
+      <div className="bg-house-green text-white flex flex-col h-full" style={{ width: `${width}px` }}>
       <div className="px-4 pt-4 pb-2">
         <div className="text-xl font-bold">buddy</div>
         <div className="text-xs text-white/70">Coding Agent 协作台</div>
@@ -80,6 +86,8 @@ export function Sidebar({
           设置
         </button>
       </div>
+    </div>
+    <ResizeHandle direction="right" onResize={onResize} />
     </div>
   )
 }

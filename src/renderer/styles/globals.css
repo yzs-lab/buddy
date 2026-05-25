@@ -25,3 +25,13 @@ body {
   height: 100vh;
   overflow: hidden;
 }
+
+/* 窗口拖动区域 */
+.drag-region {
+  -webkit-app-region: drag;
+}
+
+/* 禁止拖动的元素 */
+.no-drag {
+  -webkit-app-region: no-drag;
+}

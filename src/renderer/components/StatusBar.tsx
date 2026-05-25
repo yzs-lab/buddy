@@ -1,21 +1,26 @@
 import { TaskState, TaskSettings } from '../../shared/types'
+import { ResizeHandle } from './ResizeHandle'
 
 interface StatusBarProps {
   isOpen: boolean
+  width: number
   taskState: TaskState | null
   taskSettings: TaskSettings | null
   onSkipCountdown: () => void
   onPauseCountdown: () => void
   onInterrupt: () => void
+  onResize: (delta: number) => void
 }
 
 export function StatusBar({
   isOpen,
+  width,
   taskState,
   taskSettings,
   onSkipCountdown,
   onPauseCountdown,
-  onInterrupt
+  onInterrupt,
+  onResize
 }: StatusBarProps) {
   if (!isOpen) return null
 
@@ -24,7 +29,9 @@ export function StatusBar({
   const countdown = taskState?.countdown
 
   return (
-    <div className="w-70 bg-white border-l border-gray-200 flex flex-col h-full">
+    <div className="flex h-full">
+      <ResizeHandle direction="left" onResize={onResize} />
+      <div className="bg-white border-l border-gray-200 flex flex-col h-full" style={{ width: `${width}px` }}>
       {/* Actor 状态 */}
       <div className="p-4 border-b border-gray-200">
         <div className="text-sm font-medium text-gray-500 mb-3">运行状态</div>
@@ -129,6 +136,7 @@ export function StatusBar({
           </div>
         )}
       </div>
+    </div>
     </div>
   )
 }
