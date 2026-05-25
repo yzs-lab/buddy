@@ -1,5 +1,8 @@
 node_modules
 dist
 out
+release
 .DS_Store
 *.log
+.claude
+.pnpm-store
