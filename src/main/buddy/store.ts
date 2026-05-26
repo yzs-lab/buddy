@@ -16,7 +16,8 @@ import type {
   Task,
   TaskDetail,
   TaskSettings,
-  TaskState
+  TaskState,
+  TranscriptEntry
 } from '../../shared/types'
 import { normalizeGlobalSettings, normalizeLaunchers } from '../../shared/defaults'
 import { createBuddyPaths, taskDir, workspaceKeyForRepo } from './paths'
@@ -73,7 +74,7 @@ export class BuddyStore {
       settings,
       task_text: meta.task_text ?? '',
       context_text: meta.context_text ?? '',
-      transcript: [],
+      transcript: await this.readTranscript(taskId, workspaceKey, events),
       events,
       latest_failure: state.latest_failure ?? null
     }
@@ -232,6 +233,157 @@ export class BuddyStore {
       return []
     }
   }
+
+  private async readTranscript(
+    taskId: string,
+    workspaceKey: string,
+    events: Event[]
+  ): Promise<TranscriptEntry[]> {
+    const fromEvents = transcriptFromEvents(events)
+    if (fromEvents.length > 0) return fromEvents
+
+    const markdown = await readOptionalText(join(this.taskDirectory(taskId, workspaceKey), 'transcript.md'))
+    return transcriptFromMarkdown(markdown)
+  }
+}
+
+const TRANSCRIPT_ROLES = new Set<TranscriptEntry['role']>([
+  'human',
+  'claude',
+  'codex',
+  'opencode',
+  'kimi',
+  'system'
+])
+
+function transcriptFromEvents(events: Event[]): TranscriptEntry[] {
+  return events.flatMap((event) => {
+    const content = contentFromEvent(event)
+    if (!content) return []
+    return [{
+      role: roleFromEvent(event),
+      content,
+      ts: event.ts
+    }]
+  })
+}
+
+function roleFromEvent(event: Event): TranscriptEntry['role'] {
+  if (event.type === 'human.message' || event.type === 'message.added') return 'human'
+  if (event.type === 'actor.failed') return 'system'
+  return normalizeTranscriptRole(event.actor ?? textValue(event.payload.actor)) ?? 'system'
+}
+
+function contentFromEvent(event: Event): string {
+  const payload = event.payload
+  if (event.type === 'human.message') {
+    return normalizeTranscriptContent(textValue(payload.content) ?? textValue(payload.message) ?? '')
+  }
+  if (event.type === 'message.added') {
+    return normalizeTranscriptContent(textValue(payload.message) ?? textValue(payload.content) ?? '')
+  }
+  if (event.type === 'actor.completed') {
+    return normalizeTranscriptContent(textValue(payload.text) ?? textValue(payload.message) ?? '')
+  }
+  if (event.type === 'actor.failed') {
+    return normalizeTranscriptContent(textValue(payload.error) ?? '')
+  }
+  if (event.type === 'assistant') {
+    return normalizeTranscriptContent(textFromAssistantPayload(payload))
+  }
+  return ''
+}
+
+function textFromAssistantPayload(payload: Record<string, unknown>): string {
+  const message = payload.message
+  if (message && typeof message === 'object' && !Array.isArray(message)) {
+    const content = (message as { content?: unknown }).content
+    if (Array.isArray(content)) {
+      return content
+        .map(textFromContentPart)
+        .filter(Boolean)
+        .join('\n')
+    }
+  }
+  return textValue(payload.text) ?? textValue(payload.content) ?? ''
+}
+
+function textFromContentPart(part: unknown): string {
+  if (!part || typeof part !== 'object' || Array.isArray(part)) return ''
+  const candidate = part as { type?: unknown; text?: unknown }
+  if ((candidate.type === 'text' || candidate.type === 'output_text') && typeof candidate.text === 'string') {
+    return candidate.text
+  }
+  return ''
+}
+
+function transcriptFromMarkdown(markdown: string): TranscriptEntry[] {
+  const text = markdown.trim()
+  if (!text) return []
+
+  const entries: TranscriptEntry[] = []
+  let currentRole: TranscriptEntry['role'] | null = null
+  let currentLines: string[] = []
+  let sawHeading = false
+
+  const flush = () => {
+    if (!currentRole) return
+    const content = normalizeTranscriptContent(currentLines.join('\n'))
+    if (content) entries.push({ role: currentRole, content, ts: '' })
+  }
+
+  for (const line of markdown.split(/\r?\n/)) {
+    const heading = line.match(/^##+\s+(.+?)\s*$/)
+    if (heading) {
+      sawHeading = true
+      flush()
+      currentRole = normalizeTranscriptRole(heading[1])
+      currentLines = []
+      continue
+    }
+    if (currentRole) currentLines.push(line)
+  }
+
+  flush()
+  if (entries.length > 0 || sawHeading) return entries
+  return [{ role: 'system', content: text, ts: '' }]
+}
+
+function normalizeTranscriptRole(value: unknown): TranscriptEntry['role'] | null {
+  if (typeof value !== 'string') return null
+  const role = value.trim().toLowerCase()
+  return TRANSCRIPT_ROLES.has(role as TranscriptEntry['role'])
+    ? role as TranscriptEntry['role']
+    : null
+}
+
+function normalizeTranscriptContent(value: string): string {
+  const trimmed = value.trim()
+  if (!trimmed) return ''
+
+  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i)
+  const candidate = fenced ? fenced[1].trim() : trimmed
+  const unwrapped = unwrapJsonContent(candidate)
+  return unwrapped ?? trimmed
+}
+
+function unwrapJsonContent(value: string): string | null {
+  try {
+    const parsed = JSON.parse(value)
+    if (
+      parsed &&
+      typeof parsed === 'object' &&
+      !Array.isArray(parsed) &&
+      typeof (parsed as { content?: unknown }).content === 'string'
+    ) {
+      return ((parsed as { content: string }).content).trim()
+    }
+  } catch {}
+  return null
+}
+
+function textValue(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined
 }
 
 async function listDirectoryNames(path: string): Promise<string[]> {

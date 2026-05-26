@@ -29,7 +29,12 @@ describe('BuddyStore read model', () => {
       context_text: 'Use tests'
     }))
     await writeFile(join(taskDir, 'transcript.md'), 'hello transcript')
-    await writeFile(join(taskDir, 'events.jsonl'), '{"seq":1,"type":"task.created","ts":"2026-05-26T00:00:00.000Z","payload":{}}\n')
+    await writeFile(join(taskDir, 'events.jsonl'), [
+      '{"seq":1,"type":"task.created","ts":"2026-05-26T00:00:00.000Z","payload":{}}',
+      '{"seq":2,"type":"message.added","ts":"2026-05-26T00:01:00.000Z","payload":{"message":"Please adjust"}}',
+      '{"seq":3,"type":"actor.completed","actor":"codex","ts":"2026-05-26T00:02:00.000Z","payload":{"text":"Done"}}',
+      ''
+    ].join('\n'))
 
     const store = new BuddyStore(root)
 
@@ -47,8 +52,98 @@ describe('BuddyStore read model', () => {
       workspace_key: 'abc123def456',
       task_text: 'Build it',
       context_text: 'Use tests',
-      transcript: [],
-      events: [expect.objectContaining({ seq: 1 })]
+      transcript: [
+        expect.objectContaining({ role: 'human', content: 'Please adjust', ts: '2026-05-26T00:01:00.000Z' }),
+        expect.objectContaining({ role: 'codex', content: 'Done', ts: '2026-05-26T00:02:00.000Z' })
+      ],
+      events: expect.arrayContaining([
+        expect.objectContaining({ seq: 1 }),
+        expect.objectContaining({ seq: 2 }),
+        expect.objectContaining({ seq: 3 })
+      ])
+    })
+  })
+
+  it('loads legacy human and assistant events into the transcript', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'buddy-store-legacy-events-'))
+    const taskDir = join(root, 'workspaces', 'abc123def456', 'tasks', 'demo')
+    await mkdir(taskDir, { recursive: true })
+    await writeFile(join(taskDir, 'settings.json'), JSON.stringify({
+      protocol_version: '1',
+      countdown_seconds: 30,
+      flow_policy: 'claude_then_codex',
+      role_mode: 'claude_implements',
+      launchers: {}
+    }))
+    await writeFile(join(taskDir, 'state.json'), JSON.stringify({
+      status: 'READY',
+      round: 1,
+      next_actor: 'claude',
+      active_run: null
+    }))
+    await writeFile(join(taskDir, 'task.json'), JSON.stringify({
+      task_text: 'Build it',
+      context_text: ''
+    }))
+    await writeFile(join(taskDir, 'events.jsonl'), [
+      '{"seq":1,"type":"human.message","ts":"2026-05-26T00:01:00.000Z","payload":{"content":"More context"}}',
+      '{"seq":2,"type":"assistant","actor":"claude","ts":"2026-05-26T00:02:00.000Z","payload":{"message":{"content":[{"type":"thinking","thinking":"hidden"},{"type":"text","text":"```json\\n{\\"type\\":\\"chat\\",\\"content\\":\\"I will do it\\"}\\n```"}]}}}',
+      ''
+    ].join('\n'))
+
+    const store = new BuddyStore(root)
+
+    await expect(store.getTaskDetail('demo', 'abc123def456')).resolves.toMatchObject({
+      transcript: [
+        expect.objectContaining({ role: 'human', content: 'More context' }),
+        expect.objectContaining({ role: 'claude', content: 'I will do it' })
+      ]
+    })
+  })
+
+  it('falls back to transcript markdown when events have no messages', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'buddy-store-transcript-'))
+    const taskDir = join(root, 'workspaces', 'abc123def456', 'tasks', 'demo')
+    await mkdir(taskDir, { recursive: true })
+    await writeFile(join(taskDir, 'settings.json'), JSON.stringify({
+      protocol_version: '1',
+      countdown_seconds: 30,
+      flow_policy: 'claude_then_codex',
+      role_mode: 'claude_implements',
+      launchers: {}
+    }))
+    await writeFile(join(taskDir, 'state.json'), JSON.stringify({
+      status: 'READY',
+      round: 1,
+      next_actor: 'claude',
+      active_run: null
+    }))
+    await writeFile(join(taskDir, 'task.json'), JSON.stringify({
+      task_text: 'Build it',
+      context_text: ''
+    }))
+    await writeFile(join(taskDir, 'transcript.md'), [
+      '# demo',
+      '',
+      '## Task',
+      'Build it',
+      '',
+      '## Human',
+      'Please continue',
+      '',
+      '## Claude',
+      'Continuing now',
+      ''
+    ].join('\n'))
+    await writeFile(join(taskDir, 'events.jsonl'), '{"seq":1,"type":"task.created","ts":"2026-05-26T00:00:00.000Z","payload":{}}\n')
+
+    const store = new BuddyStore(root)
+
+    await expect(store.getTaskDetail('demo', 'abc123def456')).resolves.toMatchObject({
+      transcript: [
+        expect.objectContaining({ role: 'human', content: 'Please continue' }),
+        expect.objectContaining({ role: 'claude', content: 'Continuing now' })
+      ]
     })
   })
 

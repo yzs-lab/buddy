@@ -341,7 +341,6 @@ function ChatSidebar({
                 {pinnedTasks.map((task) => {
                   const isSelected = selectedTaskId === task.task_id
                   const isRunning = statusClass(task.status) === 'running'
-                  const round = task.round ?? 0
                   const elapsed = isRunning && task.active_run?.started_at
                     ? elapsedText(task.active_run.started_at)
                     : null
@@ -396,11 +395,9 @@ function ChatSidebar({
                           </button>
                         </div>
                       </div>
-                      {(round > 0 || elapsed) && (
+                      {elapsed && (
                         <div className="flex items-center gap-1.5 mt-0.5 pl-[22px] text-xs text-fg-muted">
-                          {round > 0 && <span>{t('sidebar.roundN', { n: round })}</span>}
-                          {round > 0 && elapsed && <span>·</span>}
-                          {elapsed && <LiveElapsed startedAt={task.active_run!.started_at} />}
+                          <LiveElapsed startedAt={task.active_run!.started_at} />
                         </div>
                       )}
                     </div>
@@ -481,7 +478,6 @@ function ChatSidebar({
                     workspaceTasks.map((task) => {
                       const isSelected = selectedTaskId === task.task_id
                       const isRunning = statusClass(task.status) === 'running'
-                      const round = task.round ?? 0
                       const elapsed = isRunning && task.active_run?.started_at
                         ? elapsedText(task.active_run.started_at)
                         : null
@@ -534,11 +530,9 @@ function ChatSidebar({
                               </button>
                             </div>
                           </div>
-                          {(round > 0 || elapsed) && (
+                          {elapsed && (
                             <div className="flex items-center gap-1.5 mt-0.5 pl-[22px] text-xs text-fg-muted">
-                              {round > 0 && <span>{t('sidebar.roundN', { n: round })}</span>}
-                              {round > 0 && elapsed && <span>·</span>}
-                              {elapsed && <LiveElapsed startedAt={task.active_run!.started_at} />}
+                              <LiveElapsed startedAt={task.active_run!.started_at} />
                             </div>
                           )}
                         </div>

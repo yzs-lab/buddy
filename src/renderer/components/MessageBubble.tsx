@@ -46,7 +46,7 @@ export function MessageBubble({ entry }: MessageBubbleProps) {
 
   return (
     <div className={`flex mb-3 ${isHuman ? 'justify-end' : 'justify-start'}`}>
-      <div className={`message ${cls} ${isRoundNotice ? 'round-notice' : ''} ${isHuman ? 'max-w-[82%]' : 'w-full'}`}>
+      <div className={`message ${cls} ${isRoundNotice ? 'round-notice' : ''} ${isHuman ? 'min-w-[66%] max-w-[82%]' : 'w-full'}`}>
         <div className="message-head">
           <span className="role">{roleLabel}</span>
           {metaText && <span>{metaText}</span>}

@@ -7,9 +7,13 @@ files:
 mac:
   category: public.app-category.developer-tools
   icon: build/icon.icns
+  hardenedRuntime: true
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.inherit.plist
+  notarize: true
   target:
+    - dmg
     - zip
-    - dir
 dmg:
   contents:
     - x: 130

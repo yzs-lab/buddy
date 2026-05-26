@@ -10,8 +10,11 @@
     "test": "vitest run tests/unit",
     "test:e2e": "sh scripts/run-e2e.sh",
     "typecheck": "tsc --noEmit",
-    "package": "electron-builder --mac",
-    "package:dir": "electron-builder --mac --dir"
+    "clean:release": "rm -rf release",
+    "dist": "pnpm build && pnpm clean:release && CUSTOM_DMGBUILD_PATH=\"$(sh scripts/prepare-dmgbuild.sh)\" CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg zip --publish never -c.mac.notarize=false",
+    "release": "pnpm typecheck && pnpm test && pnpm build && pnpm clean:release && CUSTOM_DMGBUILD_PATH=\"$(sh scripts/prepare-dmgbuild.sh)\" CSC_NAME=\"${CSC_NAME:-Developer ID Application}\" electron-builder --mac dmg zip --publish never -c.mac.forceCodeSigning=true",
+    "package": "pnpm dist",
+    "package:dir": "pnpm build && pnpm clean:release && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --dir -c.mac.notarize=false"
   },
   "keywords": [],
   "author": "",
