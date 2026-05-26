@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import { createBuddyPreloadApi } from './buddy-api'
 
 const api = {
   selectDirectory: (defaultPath?: string): Promise<string | null> =>
@@ -14,6 +15,10 @@ const api = {
     ipcRenderer.invoke('window:isFullScreen')
 }
 
+const buddy = createBuddyPreloadApi(ipcRenderer)
+
 contextBridge.exposeInMainWorld('api', api)
+contextBridge.exposeInMainWorld('buddy', buddy)
 
 export type Api = typeof api
+export type BuddyApi = typeof buddy

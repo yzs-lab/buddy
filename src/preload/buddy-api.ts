@@ -1,0 +1,59 @@
+import type {
+  BootstrapResponse,
+  CountdownInput,
+  CreateTaskInput,
+  CreateTaskResult,
+  Event,
+  GlobalSettings,
+  SendMessageInput,
+  StartTaskInput,
+  Task,
+  TaskDetail,
+  TaskEventEnvelope
+} from '../shared/types'
+
+type Listener = (event: unknown, payload: TaskEventEnvelope) => void
+
+interface IpcLike {
+  invoke(channel: string, ...args: unknown[]): Promise<unknown>
+  on(channel: string, listener: Listener): void
+  removeListener(channel: string, listener: Listener): void
+}
+
+export function createBuddyPreloadApi(ipc: IpcLike) {
+  return {
+    checkHealth: (): Promise<boolean> =>
+      ipc.invoke('buddy:checkHealth') as Promise<boolean>,
+    bootstrap: (): Promise<BootstrapResponse> =>
+      ipc.invoke('buddy:bootstrap') as Promise<BootstrapResponse>,
+    getTasks: (): Promise<Task[]> =>
+      ipc.invoke('buddy:getTasks') as Promise<Task[]>,
+    getTaskDetail: (taskId: string, workspaceKey?: string): Promise<TaskDetail> =>
+      ipc.invoke('buddy:getTaskDetail', taskId, workspaceKey) as Promise<TaskDetail>,
+    createTask: (input: CreateTaskInput): Promise<CreateTaskResult> =>
+      ipc.invoke('buddy:createTask', input) as Promise<CreateTaskResult>,
+    deleteTask: (taskId: string, workspaceKey?: string): Promise<void> =>
+      ipc.invoke('buddy:deleteTask', taskId, workspaceKey) as Promise<void>,
+    startTask: (taskId: string, input: StartTaskInput): Promise<void> =>
+      ipc.invoke('buddy:startTask', taskId, input) as Promise<void>,
+    sendMessage: (taskId: string, input: SendMessageInput): Promise<void> =>
+      ipc.invoke('buddy:sendMessage', taskId, input) as Promise<void>,
+    skipCountdown: (taskId: string, input: CountdownInput): Promise<void> =>
+      ipc.invoke('buddy:skipCountdown', taskId, input) as Promise<void>,
+    pauseCountdown: (taskId: string, input: CountdownInput): Promise<void> =>
+      ipc.invoke('buddy:pauseCountdown', taskId, input) as Promise<void>,
+    interrupt: (taskId: string, workspaceKey?: string): Promise<void> =>
+      ipc.invoke('buddy:interrupt', taskId, workspaceKey) as Promise<void>,
+    getEvents: (taskId: string, since: number, workspaceKey?: string): Promise<{ events: Event[] }> =>
+      ipc.invoke('buddy:getEvents', taskId, since, workspaceKey) as Promise<{ events: Event[] }>,
+    updateGlobalSettings: (settings: GlobalSettings): Promise<GlobalSettings> =>
+      ipc.invoke('buddy:updateGlobalSettings', settings) as Promise<GlobalSettings>,
+    onTaskEvent: (callback: (payload: TaskEventEnvelope) => void): (() => void) => {
+      const listener: Listener = (_event, payload) => callback(payload)
+      ipc.on('buddy:event', listener)
+      return () => ipc.removeListener('buddy:event', listener)
+    }
+  }
+}
+
+export type BuddyPreloadApi = ReturnType<typeof createBuddyPreloadApi>
