@@ -7,8 +7,6 @@ import {
   ACTOR_LABEL_KEY,
   Actor,
   taskActors,
-  shortId,
-  elapsedText,
   formatTime,
   decodeErrorText,
   eventPayloadSummary
@@ -83,19 +81,15 @@ export function StatusBar({
 
   if (!isOpen) return null
 
-  const isRunning = taskState?.status?.startsWith('RUNNING_') ?? false
   const isCountdown = taskState?.status === 'COUNTDOWN' && taskState?.countdown?.status === 'running'
 
   const { participants } = taskActors(taskSettings)
   const activeRun = taskState?.active_run || null
   const runningActor = activeRun?.actor || ''
-  const pendingBreak = taskState?.pending_break || null
 
   const completedRound = taskState?.round ?? 0
   const roundLabel = taskState
-    ? isRunning
-      ? t('statusBar.roundInProgress', { n: completedRound + 1 })
-      : t('statusBar.roundCompleted', { n: completedRound })
+    ? t('statusBar.roundCount', { n: completedRound })
     : t('statusBar.roundDash')
 
   const updatedText = taskState?.updated_at
@@ -140,7 +134,6 @@ export function StatusBar({
                 actor={actor}
                 taskState={taskState}
                 running={runningActor === actor}
-                pendingBreak={pendingBreak}
                 t={t}
               />
             ))}
@@ -286,32 +279,15 @@ function ActorCard({
   actor,
   taskState,
   running,
-  pendingBreak,
   t
 }: {
   actor: Actor
   taskState: TaskState | null
   running: boolean
-  pendingBreak: { actor?: string } | null
   t: TFunction
 }) {
   const sessionField = SESSION_FIELD[actor]
   const session = (taskState?.[sessionField] as string | undefined) || ''
-  const isRunningStatus = taskState?.status === `RUNNING_${actor.toUpperCase()}`
-  const confirmNeeded = pendingBreak && pendingBreak.actor !== actor
-  const stateText = isRunningStatus
-    ? t('statusBar.actor.running')
-    : confirmNeeded
-      ? t('statusBar.actor.confirmEnd')
-      : session
-        ? t('statusBar.actor.bound')
-        : t('statusBar.actor.idle')
-
-  const stateBadgeClass = isRunningStatus
-    ? 'bg-success-bg text-success-fg'
-    : session
-      ? 'bg-bg-muted text-fg-secondary'
-      : 'text-fg-muted'
 
   const handleCopy = () => {
     if (!session) return
@@ -320,24 +296,18 @@ function ActorCard({
 
   return (
     <div className={`rounded-lg border border-border-subtle p-3 ${running ? 'bg-bg-subtle' : 'bg-bg-elevated'}`}>
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="text-sm font-medium">{ACTOR_DISPLAY_NAME[actor]}</span>
-        <span className={`text-xs px-2 py-0.5 rounded ${stateBadgeClass}`}>{stateText}</span>
-      </div>
-      <div className="flex items-center gap-1 text-xs text-fg-secondary">
-        <span>{t('statusBar.actor.session', { id: session ? shortId(session) : t('common.unbound') })}</span>
+      <div className="text-sm font-medium mb-1.5">{ACTOR_DISPLAY_NAME[actor]}</div>
+      <div className="flex items-center justify-between gap-2 text-xs text-fg-secondary">
+        <span className="min-w-0 truncate">{t('statusBar.actor.session', { id: session || '-' })}</span>
         {session && (
           <button
             onClick={handleCopy}
             title={t('statusBar.actor.copy')}
-            className="w-5 h-5 flex items-center justify-center rounded text-fg-muted hover:text-fg hover:bg-bg-muted"
+            className="flex-shrink-0 w-5 h-5 flex items-center justify-center rounded text-fg-muted hover:text-fg hover:bg-bg-muted"
           >
             <Copy size={12} strokeWidth={2} />
           </button>
         )}
-      </div>
-      <div className="text-xs text-fg-secondary mt-0.5">
-        {t('statusBar.actor.elapsed', { elapsed: running ? elapsedText(taskState?.active_run?.started_at) : '-' })}
       </div>
     </div>
   )
@@ -356,29 +326,22 @@ function SettingsSummary({
   const hasCommands = Boolean(
     launchers.claude?.command && (launchers.codex?.command || launchers.opencode?.command)
   )
-  const { impl, rev, participants } = taskActors(settings)
+  const { impl, rev } = taskActors(settings)
   const display = (v?: string) => actorLabel(v, t)
   const repoRoot = taskState?.repo_root || '-'
 
-  const isRunningInSettings = taskState?.status?.startsWith('RUNNING_') ?? false
-  const nextActorDisplay = (() => {
-    if (isRunningInSettings && taskState?.active_run?.actor) {
-      return participants.find(a => a !== taskState.active_run!.actor) || taskState?.next_actor
-    }
-    if (taskState?.status === 'COUNTDOWN' && taskState?.countdown?.status === 'running' && taskState.countdown.default_next_actor) {
-      return taskState.countdown.default_next_actor
-    }
-    return taskState?.next_actor
-  })()
+  const countdownSeconds = settings?.countdown_seconds ?? 30
+  const maxRounds = settings?.max_rounds ?? 10
 
   const rows: Array<[string, string]> = [
     [t('statusBar.summary.implementer'), display(impl)],
     [t('statusBar.summary.reviewer'), display(rev)],
     [t('statusBar.summary.repoRoot'), repoRoot],
     [t('statusBar.summary.launchCmd'), hasCommands ? t('statusBar.summary.launchCmdCustom') : '-'],
-    [t('statusBar.summary.countdown'), `${settings?.countdown_seconds ?? 30}s`],
-    [t('statusBar.summary.maxRounds'), String(settings?.max_rounds ?? 10)],
-    [t('statusBar.summary.nextRound'), display(nextActorDisplay)]
+    [
+      t('statusBar.summary.timing'),
+      t('statusBar.summary.timingValue', { seconds: countdownSeconds, rounds: maxRounds })
+    ]
   ]
 
   return (
@@ -407,16 +370,15 @@ function EventLog({ events, t, lang }: { events: Event[]; t: TFunction; lang: La
           Boolean((event.payload || {}).error)
         const summary = eventPayloadSummary(event, lang)
         return (
-          <div
-            key={event.seq}
-            className={`pl-2 border-l-2 ${failed ? 'border-danger' : 'border-border'}`}
-          >
-            <div className="text-xs font-medium">
-              #{event.seq} · {event.type}
-            </div>
-            <div className="text-xs text-fg-secondary mt-0.5">
-              {formatTime(event.ts, lang)}
-              {event.actor ? ` · ${actorLabel(event.actor, t)}` : ''}
+          <div key={event.seq} className="text-xs">
+            <div className="flex items-baseline justify-between gap-3">
+              <span className={`font-medium truncate ${failed ? 'text-danger' : ''}`}>
+                {event.seq} · {event.type}
+              </span>
+              <span className="text-fg-secondary flex-shrink-0">
+                {event.actor ? `${actorLabel(event.actor, t)} ` : ''}
+                {formatTime(event.ts, lang)}
+              </span>
             </div>
             {summary && (
               <pre className="mt-1 text-xs text-fg-secondary bg-bg-subtle rounded p-1.5 whitespace-pre-wrap break-words">

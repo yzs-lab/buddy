@@ -218,4 +218,17 @@ describe('Sidebar', () => {
     expect(screen.queryByText('first')).toBeNull()
     expect(screen.queryByText('second')).toBeNull()
   })
+
+  it('keeps task rows at a fixed height when hover actions appear', () => {
+    window.localStorage.setItem('buddy.pinnedTaskIds', JSON.stringify(['pinned']))
+
+    renderSidebar([task('pinned'), task('regular')])
+
+    for (const taskId of ['pinned', 'regular']) {
+      const row = screen.getByText(taskId).closest('[title]')
+      expect(row).not.toBeNull()
+      expect(row).toHaveClass('h-7')
+      expect(row).not.toHaveClass('py-1.5')
+    }
+  })
 })

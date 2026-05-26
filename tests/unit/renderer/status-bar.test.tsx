@@ -82,4 +82,18 @@ describe('StatusBar inline run status', () => {
     expect(html).toContain('lucide-rotate-cw')
     expect(html).toContain('Command failed')
   })
+
+  it('renders the full session id while preserving right-side overflow clipping', () => {
+    const longSessionId = 'claude-session-id-that-should-render-in-full-without-shortening'
+    const html = renderStatusBar({
+      taskState: {
+        ...runningTaskState(),
+        claude_session_id: longSessionId
+      }
+    })
+
+    expect(html).toContain(longSessionId)
+    expect(html).not.toContain('claude-s...tening')
+    expect(html).toContain('class="min-w-0 truncate"')
+  })
 })

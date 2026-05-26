@@ -17,6 +17,8 @@ module.exports = {
         'border-subtle': 'var(--border-subtle)',
         accent: 'var(--accent)',
         'accent-hover': 'var(--accent-hover)',
+        'accent-soft': 'var(--accent-soft)',
+        'accent-soft-hover': 'var(--accent-soft-hover)',
         'success-bg': 'var(--success-bg)',
         'success-fg': 'var(--success-fg)',
         danger: 'var(--danger)',

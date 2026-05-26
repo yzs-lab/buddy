@@ -318,7 +318,7 @@ function ChatSidebar({
       <div className="px-4 py-2">
         <button
           onClick={() => onCreateTask()}
-          className="w-full px-4 py-2 bg-accent text-fg-inverse rounded-lg hover:bg-accent-hover transition-colors flex items-center justify-center gap-2"
+          className="w-full px-4 py-2 bg-accent-soft text-fg rounded-lg hover:bg-accent-soft-hover transition-colors flex items-center justify-center gap-2"
         >
           <SquarePlus size={14} strokeWidth={2} />
           {t('sidebar.newTask')}
@@ -359,7 +359,7 @@ function ChatSidebar({
                       key={task.task_id}
                       onClick={() => onSelectTask(task.task_id, task.workspace_key)}
                       title={`${task.task_id}\n${task.workspace_key}`}
-                      className={`group/task w-full text-left px-3 py-1.5 ml-2 rounded-md mb-0.5 transition-colors cursor-pointer ${
+                      className={`group/task w-full h-7 text-left px-3 ml-2 rounded-md mb-0.5 transition-colors cursor-pointer ${
                         isSelected
                           ? 'bg-bg-muted'
                           : 'hover:bg-bg-subtle'
@@ -367,8 +367,8 @@ function ChatSidebar({
                     >
                       <div className="flex items-center gap-2">
                         <span className={`status-dot status-dot-${statusClass(task.status)} ${isRunning ? 'status-dot-pulse' : ''}`} />
-                        <span className={`text-sm truncate flex-1 ${
-                          isSelected ? 'text-fg font-medium' : 'text-fg-secondary'
+                        <span className={`text-xs truncate flex-1 ${
+                          isSelected ? 'text-fg' : 'text-fg-secondary'
                         }`}>
                           {task.task_id}
                         </span>
@@ -417,7 +417,7 @@ function ChatSidebar({
               const isCollapsed = collapsedProjectKeys.includes(projectKey)
               const isExpanded = !isCollapsed
               return (
-                <div key={projectKey} className="mb-3">
+                <div key={projectKey} className="mb-0">
                   <div
                     role="button"
                     tabIndex={0}
@@ -430,8 +430,8 @@ function ChatSidebar({
                       }
                     }}
                     title={repoRoot || projectKey}
-                    className={`group flex items-center gap-2 px-2 py-1.5 text-sm rounded-md hover:bg-bg-subtle cursor-pointer focus:outline-none ${
-                    hasSelected ? 'text-fg font-medium' : 'text-fg-secondary'
+                    className={`group flex items-center gap-2 px-2 py-1 text-sm rounded-md hover:bg-bg-subtle cursor-pointer focus:outline-none ${
+                    hasSelected ? 'text-fg' : 'text-fg-secondary'
                   }`}>
                     <FolderIcon isOpen={isExpanded} />
                     <span className="truncate flex-1">{projectKey}</span>
@@ -499,7 +499,7 @@ function ChatSidebar({
                           key={task.task_id}
                           onClick={() => onSelectTask(task.task_id, task.workspace_key)}
                           title={`${task.task_id}\n${task.workspace_key}`}
-                          className={`group/task w-full text-left px-3 py-1.5 ml-2 rounded-md mb-0.5 transition-colors cursor-pointer ${
+                          className={`group/task w-full h-7 text-left px-3 ml-2 rounded-md mb-0.5 transition-colors cursor-pointer ${
                             isSelected
                               ? 'bg-bg-muted'
                               : 'hover:bg-bg-subtle'
@@ -507,8 +507,8 @@ function ChatSidebar({
                         >
                           <div className="flex items-center gap-2">
                             <span className={`status-dot status-dot-${statusClass(task.status)} ${isRunning ? 'status-dot-pulse' : ''}`} />
-                            <span className={`text-sm truncate flex-1 ${
-                              isSelected ? 'text-fg font-medium' : 'text-fg-secondary'
+                            <span className={`text-xs truncate flex-1 ${
+                              isSelected ? 'text-fg' : 'text-fg-secondary'
                             }`}>
                               {task.task_id}
                             </span>
