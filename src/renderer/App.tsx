@@ -11,6 +11,7 @@ import { StatusBar } from './components/StatusBar'
 import { SettingsContent, SettingsTab } from './components/SettingsContent'
 import { ACTOR_LABEL_KEY, Actor } from './lib/format'
 import type { GlobalSettings } from '../shared/types'
+import { defaultLauncherFor, normalizeGlobalSettings } from '../shared/defaults'
 
 export default function App() {
   const t = useT()
@@ -393,8 +394,9 @@ function CreateTaskModal({
   const [reviewer, setReviewer] = useState<Actor>('codex')
   const [implementerSession, setImplementerSession] = useState('')
   const [reviewerSession, setReviewerSession] = useState('')
-  const [maxRounds, setMaxRounds] = useState<number>(globalSettings?.max_rounds ?? 10)
-  const [countdownSeconds, setCountdownSeconds] = useState<number>(globalSettings?.countdown_seconds ?? 30)
+  const normalizedGlobalSettings = normalizeGlobalSettings(globalSettings)
+  const [maxRounds, setMaxRounds] = useState<number>(normalizedGlobalSettings.max_rounds ?? 10)
+  const [countdownSeconds, setCountdownSeconds] = useState<number>(normalizedGlobalSettings.countdown_seconds ?? 30)
 
   const TASK_NAME_RE = /^[a-zA-Z0-9一-鿿㐀-䶿""「」【】{}][a-zA-Z0-9一-鿿㐀-䶿 ._\-""「」【】{}]{0,63}$/
   const taskIdError = taskId.trim() && !TASK_NAME_RE.test(taskId.trim())
@@ -412,21 +414,21 @@ function CreateTaskModal({
 
   const handleSubmit = () => {
     if (!canSubmit) return
-    const launchers = globalSettings?.launchers ?? {}
+    const launchers = normalizedGlobalSettings.launchers ?? {}
     const launcherFor = (actor: Actor) => ({
-      command: launchers[actor]?.command ?? '',
-      env: {},
-      timeout_seconds: 7200
+      command: launchers[actor]?.command ?? defaultLauncherFor(actor).command,
+      env: { ...(launchers[actor]?.env ?? {}) },
+      timeout_seconds: launchers[actor]?.timeout_seconds ?? defaultLauncherFor(actor).timeout_seconds
     })
     const settings: Record<string, unknown> = {
-      protocol_version: globalSettings?.protocol_version ?? '1',
+      protocol_version: normalizedGlobalSettings.protocol_version ?? '1',
       countdown_seconds: countdownSeconds,
       flow_policy: 'claude_then_codex',
       role_mode: implementer === 'codex' ? 'codex_implements' : 'claude_implements',
       implementer_actor: implementer,
       reviewer_actor: reviewer,
       max_rounds: maxRounds,
-      max_consecutive_failures: globalSettings?.max_consecutive_failures ?? 3,
+      max_consecutive_failures: normalizedGlobalSettings.max_consecutive_failures ?? 3,
       launchers: {
         claude: launcherFor('claude'),
         codex: launcherFor('codex'),

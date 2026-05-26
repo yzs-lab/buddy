@@ -12,14 +12,16 @@ import type {
   CreateTaskResult,
   Event,
   GlobalSettings,
+  Launcher,
   Task,
   TaskDetail,
   TaskSettings,
   TaskState
 } from '../../shared/types'
+import { normalizeGlobalSettings, normalizeLaunchers } from '../../shared/defaults'
 import { createBuddyPaths, taskDir, workspaceKeyForRepo } from './paths'
 import { redactJsonValue } from './redact'
-import { parseEventLine, parseTaskSettings, parseTaskState } from './schemas'
+import { parseEventLine, parseGlobalSettings, parseTaskSettings, parseTaskState } from './schemas'
 
 interface TaskMeta {
   task_text?: string
@@ -88,8 +90,10 @@ export class BuddyStore {
     const dir = this.taskDirectory(input.task_id, workspaceKey)
     const now = new Date().toISOString()
 
+    const globalSettings = await this.readGlobalSettings()
+
     await mkdir(join(dir, 'artifacts'), { recursive: true })
-    await atomicWriteJson(join(dir, 'settings.json'), defaultTaskSettings(input.settings))
+    await atomicWriteJson(join(dir, 'settings.json'), defaultTaskSettings(globalSettings, input.settings))
     await atomicWriteJson(join(dir, 'state.json'), defaultTaskState(repoRoot, now))
     await atomicWriteJson(join(dir, 'task.json'), {
       task_text: input.task_text ?? '',
@@ -115,8 +119,22 @@ export class BuddyStore {
 
   async updateGlobalSettings(settings: GlobalSettings): Promise<GlobalSettings> {
     const path = createBuddyPaths(this.dataRoot).globalSettings
-    await atomicWriteJson(path, settings)
-    return settings
+    const normalized = normalizeGlobalSettings(settings)
+    await atomicWriteJson(path, normalized)
+    return normalized
+  }
+
+  async readGlobalSettings(): Promise<GlobalSettings> {
+    const path = createBuddyPaths(this.dataRoot).globalSettings
+    try {
+      const parsed = parseGlobalSettings(await readJson(path)) as GlobalSettings
+      return normalizeGlobalSettings(parsed)
+    } catch (error) {
+      if (isNotFoundError(error)) {
+        return normalizeGlobalSettings()
+      }
+      throw error
+    }
   }
 
   async readTaskState(taskId: string, workspaceKey: string): Promise<TaskState> {
@@ -232,15 +250,49 @@ async function atomicAppendText(path: string, value: string): Promise<void> {
   await writeFile(path, value, { flag: 'a' })
 }
 
-function defaultTaskSettings(overrides?: Record<string, unknown>): TaskSettings {
+function defaultTaskSettings(
+  globalSettings: GlobalSettings,
+  overrides: Record<string, unknown> = {}
+): TaskSettings {
+  const normalizedGlobal = normalizeGlobalSettings(globalSettings)
+  const { launchers: overrideLaunchers, ...restOverrides } = overrides
+  const launchers = normalizeLaunchers({
+    ...normalizedGlobal.launchers,
+    ...coerceLauncherOverrides(overrideLaunchers)
+  })
+
   return {
-    protocol_version: '1',
-    countdown_seconds: 30,
+    protocol_version: normalizedGlobal.protocol_version ?? '1',
+    countdown_seconds: normalizedGlobal.countdown_seconds ?? 30,
     flow_policy: 'claude_then_codex',
     role_mode: 'claude_implements',
-    launchers: {},
-    ...overrides
+    launchers,
+    max_rounds: normalizedGlobal.max_rounds,
+    max_consecutive_failures: normalizedGlobal.max_consecutive_failures,
+    ...restOverrides
   } as TaskSettings
+}
+
+function coerceLauncherOverrides(value: unknown): Record<string, Partial<Launcher>> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {}
+  }
+
+  const launchers: Record<string, Partial<Launcher>> = {}
+  for (const [actor, raw] of Object.entries(value)) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue
+    const candidate = raw as Partial<Launcher>
+    launchers[actor] = {
+      command: candidate.command,
+      env: candidate.env,
+      timeout_seconds: candidate.timeout_seconds
+    }
+  }
+  return launchers
+}
+
+function isNotFoundError(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT'
 }
 
 function defaultTaskState(repoRoot: string, now: string): TaskState {

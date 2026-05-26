@@ -5,6 +5,7 @@ import { useUpdateGlobalSettings } from '../hooks/useBuddy'
 import { useLanguagePref, useSendShortcut, useT, TFunction } from '../hooks/useI18n'
 import { LANGUAGE_OPTIONS, LanguagePref, SendShortcut } from '../lib/i18n'
 import type { GlobalSettings, Launcher } from '../../shared/types'
+import { DEFAULT_LAUNCHER_ORDER, defaultLauncherFor, normalizeGlobalSettings } from '../../shared/defaults'
 
 export type SettingsTab = 'general' | 'appearance'
 
@@ -12,8 +13,6 @@ interface SettingsContentProps {
   tab: SettingsTab
   globalSettings: GlobalSettings | null
 }
-
-const LAUNCHER_ORDER: string[] = ['claude', 'codex', 'opencode', 'kimi']
 
 type LauncherInfo = { title: string; label: string; placeholder: string; hint: React.ReactNode }
 
@@ -143,22 +142,17 @@ function GeneralSection() {
 function GeneralSettings({ globalSettings }: { globalSettings: GlobalSettings | null }) {
   const t = useT()
   const updateMutation = useUpdateGlobalSettings()
-  const launchers = globalSettings?.launchers ?? {}
+  const normalizedSettings = normalizeGlobalSettings(globalSettings)
+  const launchers = normalizedSettings.launchers ?? {}
 
-  const buildBase = (): GlobalSettings => ({
-    protocol_version: globalSettings?.protocol_version ?? '1',
-    countdown_seconds: globalSettings?.countdown_seconds ?? 30,
-    max_rounds: globalSettings?.max_rounds ?? 10,
-    max_consecutive_failures: globalSettings?.max_consecutive_failures ?? 3,
-    launchers: globalSettings?.launchers ?? {}
-  })
+  const buildBase = (): GlobalSettings => normalizedSettings
 
   const save = (patch: Partial<GlobalSettings>) => {
     updateMutation.mutate({ ...buildBase(), ...patch })
   }
 
   const saveLauncher = (actor: string, patch: Partial<Launcher>) => {
-    const cur = launchers[actor] ?? { command: '', env: {}, timeout_seconds: 7200 }
+    const cur = launchers[actor] ?? defaultLauncherFor(actor)
     const next = { ...cur, ...patch, env: cur.env }
     save({ launchers: { ...launchers, [actor]: next } })
   }
@@ -172,7 +166,7 @@ function GeneralSettings({ globalSettings }: { globalSettings: GlobalSettings | 
   }
 
   const currentTimeout =
-    LAUNCHER_ORDER.map((a) => launchers[a]?.timeout_seconds).find((v) => typeof v === 'number') ?? 7200
+    DEFAULT_LAUNCHER_ORDER.map((a) => launchers[a]?.timeout_seconds).find((v) => typeof v === 'number') ?? 7200
 
   return (
     <div className="space-y-8">
@@ -183,23 +177,20 @@ function GeneralSettings({ globalSettings }: { globalSettings: GlobalSettings | 
         <p className="text-sm text-fg-secondary mb-5">{t('settings.cli.desc')}</p>
       </div>
 
-      {LAUNCHER_ORDER.some((a) => launchers[a]) && (
-        <SettingsList>
-          {LAUNCHER_ORDER.map((actor) => {
-            const launcher = launchers[actor]
-            if (!launcher) return null
-            return (
-              <LauncherSection
-                key={actor}
-                actor={actor}
-                launcher={launcher}
-                info={launcherInfoFor(actor, t)}
-                onSaveCommand={(command) => saveLauncher(actor, { command })}
-              />
-            )
-          })}
-        </SettingsList>
-      )}
+      <SettingsList>
+        {DEFAULT_LAUNCHER_ORDER.map((actor) => {
+          const launcher = launchers[actor] ?? defaultLauncherFor(actor)
+          return (
+            <LauncherSection
+              key={actor}
+              actor={actor}
+              launcher={launcher}
+              info={launcherInfoFor(actor, t)}
+              onSaveCommand={(command) => saveLauncher(actor, { command })}
+            />
+          )
+        })}
+      </SettingsList>
 
       <div className="pt-4">
         <h2 className="text-base font-semibold text-fg mb-1">{t('settings.collab.title')}</h2>

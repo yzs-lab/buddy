@@ -60,7 +60,16 @@ export const taskSettingsSchema = z.object({
   launchers: z.record(z.string(), launcherSchema).default({}),
   implementer_actor: z.string().optional(),
   reviewer_actor: z.string().optional(),
-  max_rounds: z.number().optional()
+  max_rounds: z.number().optional(),
+  max_consecutive_failures: z.number().optional()
+})
+
+export const globalSettingsSchema = z.object({
+  protocol_version: z.string().default('1'),
+  countdown_seconds: z.number().default(30),
+  max_rounds: z.number().default(10),
+  max_consecutive_failures: z.number().default(3),
+  launchers: z.record(z.string(), launcherSchema).default({})
 })
 
 export const eventSchema = z.object({
@@ -77,6 +86,10 @@ export function parseTaskState(input: unknown) {
 
 export function parseTaskSettings(input: unknown) {
   return taskSettingsSchema.parse(input)
+}
+
+export function parseGlobalSettings(input: unknown) {
+  return globalSettingsSchema.parse(input)
 }
 
 export function parseEventLine(line: string) {

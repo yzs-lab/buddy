@@ -1,3 +1,6 @@
+import { mkdtemp } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { BuddyCoreService } from '../../../src/main/buddy/service'
 
@@ -8,12 +11,21 @@ describe('BuddyCoreService', () => {
     await expect(service.checkHealth()).resolves.toBe(true)
   })
 
-  it('returns empty bootstrap before store is wired', async () => {
-    const service = new BuddyCoreService()
+  it('returns bootstrap with native global CLI settings', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'buddy-service-bootstrap-'))
+    const service = new BuddyCoreService(root)
 
     await expect(service.bootstrap()).resolves.toMatchObject({
       version: 'native',
-      tasks: []
+      tasks: [],
+      global_settings: {
+        launchers: {
+          claude: { command: 'claude --dangerously-skip-permissions' },
+          codex: { command: 'codex' },
+          opencode: { command: 'opencode' },
+          kimi: { command: 'kimi' }
+        }
+      }
     })
   })
 })

@@ -23,4 +23,33 @@ describe('BuddyStore writes', () => {
     await expect(readFile(join(taskDir, 'transcript.md'), 'utf8')).resolves.toContain('Build it')
     await expect(readFile(join(taskDir, 'events.jsonl'), 'utf8')).resolves.toContain('"task.created"')
   })
+
+  it('uses global CLI settings when creating a task without explicit launchers', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'buddy-write-global-'))
+    const store = new BuddyStore(root)
+    await store.updateGlobalSettings({
+      countdown_seconds: 12,
+      launchers: {
+        codex: {
+          command: 'codex --profile native',
+          env: { BUDDY_MODE: 'native' },
+          timeout_seconds: 123
+        }
+      }
+    })
+
+    const result = await store.createTask({
+      task_id: 'demo',
+      repo_root: '/tmp/repo'
+    })
+
+    const taskDir = join(root, 'workspaces', result.workspace_key, 'tasks', 'demo')
+    const settings = JSON.parse(await readFile(join(taskDir, 'settings.json'), 'utf8'))
+    expect(settings.countdown_seconds).toBe(12)
+    expect(settings.launchers.codex).toEqual({
+      command: 'codex --profile native',
+      env: { BUDDY_MODE: 'native' },
+      timeout_seconds: 123
+    })
+  })
 })

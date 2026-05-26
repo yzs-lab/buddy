@@ -42,7 +42,8 @@ export class BuddyCoreService {
       version: 'native',
       repo_root: '',
       data_root: this.store.dataRoot,
-      tasks: await this.store.getTasks()
+      tasks: await this.store.getTasks(),
+      global_settings: await this.store.readGlobalSettings()
     }
   }
 

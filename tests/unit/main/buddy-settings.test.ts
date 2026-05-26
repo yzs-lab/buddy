@@ -5,6 +5,24 @@ import { describe, expect, it } from 'vitest'
 import { BuddyStore } from '../../../src/main/buddy/store'
 
 describe('BuddyStore settings and delete', () => {
+  it('returns default CLI launchers when no global settings file exists', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'buddy-settings-default-'))
+    const store = new BuddyStore(root)
+
+    await expect(store.readGlobalSettings()).resolves.toMatchObject({
+      protocol_version: '1',
+      countdown_seconds: 30,
+      max_rounds: 10,
+      max_consecutive_failures: 3,
+      launchers: {
+        claude: { command: 'claude --dangerously-skip-permissions', env: {}, timeout_seconds: 7200 },
+        codex: { command: 'codex', env: {}, timeout_seconds: 7200 },
+        opencode: { command: 'opencode', env: {}, timeout_seconds: 7200 },
+        kimi: { command: 'kimi', env: {}, timeout_seconds: 7200 }
+      }
+    })
+  })
+
   it('updates global settings', async () => {
     const root = await mkdtemp(join(tmpdir(), 'buddy-settings-'))
     const store = new BuddyStore(root)
@@ -12,6 +30,12 @@ describe('BuddyStore settings and delete', () => {
     await store.updateGlobalSettings({ countdown_seconds: 45 })
 
     await expect(readFile(join(root, 'global', 'settings.json'), 'utf8')).resolves.toContain('"countdown_seconds":45')
+    await expect(store.readGlobalSettings()).resolves.toMatchObject({
+      countdown_seconds: 45,
+      launchers: {
+        claude: expect.objectContaining({ command: 'claude --dangerously-skip-permissions' })
+      }
+    })
   })
 
   it('deletes task directories', async () => {
