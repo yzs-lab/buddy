@@ -222,16 +222,27 @@ export function decodeErrorText(text: string): string {
 
 export function eventPayloadSummary(event: Event, lang?: Language): string {
   const payload = event.payload || {}
-  const value = (payload.error as string | undefined) || (payload.text as string | undefined) || ''
+  const error = payload.error
+  const textPayload = shouldSummarizeTextPayload(event.type) ? payload.text : undefined
+  const value = error ?? textPayload ?? ''
   if (!value) return ''
   const raw = typeof value === 'string' ? value : JSON.stringify(value)
-  const text = decodeErrorText(raw)
-  if (text.length <= 1200) return text
+  const decoded = decodeErrorText(raw)
+  if (decoded.length <= 1200) return decoded
   const tail =
     lang === 'en' ? '\n…(truncated)'
       : lang === 'zh-TW' ? '\n…（已截斷）'
         : '\n...（已截断）'
-  return `${text.slice(0, 1200).trimEnd()}${tail}`
+  return `${decoded.slice(0, 1200).trimEnd()}${tail}`
+}
+
+function shouldSummarizeTextPayload(type: string): boolean {
+  return (
+    type === 'actor.stderr' ||
+    type === 'permission.detected' ||
+    type.endsWith('.failed') ||
+    type.endsWith('.error')
+  )
 }
 
 export function formatTime(value: string | undefined | null, lang?: Language): string {

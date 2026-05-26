@@ -125,6 +125,36 @@ describe('decodeErrorText', () => {
 })
 
 describe('eventPayloadSummary', () => {
+  it('does not summarize normal actor.completed transcript text', () => {
+    const result = eventPayloadSummary({
+      seq: 60,
+      type: 'actor.completed',
+      actor: 'claude',
+      ts: '2026-05-26T13:41:56Z',
+      payload: {
+        buddy_type: 'break',
+        text: '确认结束。最终实现已满足全部 human 反馈。',
+        raw_text: '{"type":"break","content":"确认结束。"}'
+      }
+    })
+
+    expect(result).toBe('')
+  })
+
+  it('still summarizes exceptional text payloads such as stderr', () => {
+    const result = eventPayloadSummary({
+      seq: 8,
+      type: 'actor.stderr',
+      actor: 'claude',
+      ts: '2026-05-26T00:00:00Z',
+      payload: {
+        text: 'Permission prompt detected'
+      }
+    })
+
+    expect(result).toBe('Permission prompt detected')
+  })
+
   it('decodes JSON payload errors into readable structure', () => {
     const result = eventPayloadSummary({
       seq: 7,
