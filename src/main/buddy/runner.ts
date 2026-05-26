@@ -1,4 +1,5 @@
-import { access, mkdir, writeFile } from 'node:fs/promises'
+import { randomBytes } from 'node:crypto'
+import { access, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type {
   CountdownInput,
@@ -6,9 +7,9 @@ import type {
   StartTaskInput,
   TaskState
 } from '../../shared/types'
-import { buildLauncherCommand, runLauncher } from './launchers'
+import { buildLauncherCommand, commandKindFor, runLauncher, type LauncherCommandKind } from './launchers'
 import { createRunLock, removeRunLock } from './locks'
-import { parseActorLine, parseBuddyMessage, ParsedActorLine } from './parsers'
+import { extractActorOutput, parseActorEvents, parseBuddyMessage, ParsedActorLine } from './parsers'
 import { buildActorPrompt } from './prompts'
 import { BuddyStore } from './store'
 
@@ -151,16 +152,30 @@ export class BuddyRunner {
       transcript: detail.transcript
     })
     const promptFile = join(artifactsDir, `${runId}-prompt.md`)
+    const outputFile = join(artifactsDir, `${runId}-output.md`)
+    const eventFile = join(artifactsDir, `${runId}-events.jsonl`)
     await writeFile(promptFile, prompt)
+    const cwd = await existingCwd(detail.state.repo_root)
+    const existingSessionId = sessionIdForActor(actor, detail.state)
+    const commandKind = commandKindFor(actor, launcher.command)
+    const sessionId = actor === 'kimi' && commandKind === 'native_kimi' && !existingSessionId
+      ? randomBytes(8).toString('hex')
+      : existingSessionId
     const command = buildLauncherCommand({
       actor,
       command: launcher.command,
+      mode: existingSessionId ? 'resume' : 'start',
       promptFile,
-      sessionId: sessionIdForActor(actor, detail.state)
+      promptText: prompt,
+      eventFile,
+      outputFile,
+      repoRoot: cwd,
+      taskDir: taskDirectory,
+      runId,
+      sessionId
     })
     const outputLines: string[] = []
     const stderrLines: string[] = []
-    const parsedLines: ParsedActorLine[] = []
     const lockPath = await createRunLock(this.store.dataRoot, {
       workspace_key: workspaceKey,
       task_id: taskId,
@@ -172,29 +187,29 @@ export class BuddyRunner {
       const result = await runLauncher({
         command: command.command,
         args: command.args,
-        cwd: await existingCwd(detail.state.repo_root),
-        env: launcher.env,
-        stdinText: prompt,
+        cwd,
+        env: { ...launcher.env, ...(command.env ?? {}) },
+        stdinText: command.stdinText,
         timeoutMs: launcher.timeout_seconds * 1000,
         onStdout: (line) => {
           outputLines.push(line)
-          try {
-            const parsed = parseActorLine(actor, line)
-            parsedLines.push(parsed)
-          } catch {
-            parsedLines.push({ text: line })
-          }
         },
         onStderr: (line) => stderrLines.push(line)
       })
 
-      await writeFile(join(artifactsDir, `${runId}-output.md`), outputLines.join('\n'))
+      const stdoutText = outputLines.join('\n')
+      const rawEvents = await collectRawEvents(eventFile, stdoutText, command.kind)
+      const outputText = await collectOutputText(actor, command.kind, outputFile, stdoutText)
+      const parsedLines = parseActorEvents(actor, rawEvents)
+      if (actor === 'kimi' && sessionId && !parsedLines.some((line) => line.sessionId)) {
+        parsedLines.push({ sessionId })
+      }
 
       if (result.exitCode !== 0) {
         throw new Error(stderrLines.join('\n') || `Actor exited with ${result.exitCode}`)
       }
 
-      await this.completeActor(taskId, workspaceKey, actor, runId, parsedLines)
+      await this.completeActor(taskId, workspaceKey, actor, runId, outputText, parsedLines)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       const failureMessage = stderrLines.join('\n') || message
@@ -210,9 +225,10 @@ export class BuddyRunner {
     workspaceKey: string,
     actor: string,
     runId: string,
+    outputText: string,
     parsedLines: ParsedActorLine[]
   ): Promise<void> {
-    const text = parsedLines.map((line) => line.text).filter(Boolean).join('\n')
+    const text = outputText
     const sessionId = lastValue(parsedLines.map((line) => line.sessionId))
     const threadId = lastValue(parsedLines.map((line) => line.threadId))
     const message = parseBuddyMessage(text)
@@ -235,6 +251,8 @@ export class BuddyRunner {
       }
       if (actor === 'claude' && sessionId) next.claude_session_id = sessionId
       if (actor === 'codex' && threadId) next.codex_thread_id = threadId
+      if (actor === 'opencode' && sessionId) next.opencode_session_id = sessionId
+      if (actor === 'kimi' && sessionId) next.kimi_session_id = sessionId
 
       if (message.kind === 'break') {
         if (detail.state.pending_break?.actor && detail.state.pending_break.actor !== actor) {
@@ -314,5 +332,59 @@ async function existingCwd(path?: string): Promise<string> {
     return path
   } catch {
     return process.cwd()
+  }
+}
+
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    await access(path)
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function collectRawEvents(
+  eventFile: string,
+  stdoutText: string,
+  kind: LauncherCommandKind
+): Promise<string> {
+  if (kind !== 'contract') {
+    if (stdoutText) await writeFile(eventFile, stdoutText)
+    return stdoutText
+  }
+
+  const fileText = await readOptionalText(eventFile)
+  if (fileText && stdoutText) return `${fileText.trimEnd()}\n${stdoutText}`
+  if (fileText) return fileText
+  if (stdoutText) {
+    await writeFile(eventFile, stdoutText)
+    return stdoutText
+  }
+  return ''
+}
+
+async function collectOutputText(
+  actor: string,
+  kind: LauncherCommandKind,
+  outputFile: string,
+  stdoutText: string
+): Promise<string> {
+  if (kind === 'native_claude' || kind === 'native_opencode' || kind === 'native_kimi') {
+    const output = extractActorOutput(actor, stdoutText)
+    await writeFile(outputFile, output)
+    return output
+  }
+
+  if (await fileExists(outputFile)) return readFile(outputFile, 'utf8')
+  const extracted = extractActorOutput(actor, stdoutText)
+  return extracted || stdoutText
+}
+
+async function readOptionalText(path: string): Promise<string> {
+  try {
+    return await readFile(path, 'utf8')
+  } catch {
+    return ''
   }
 }

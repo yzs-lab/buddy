@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  extractActorOutput,
+  parseActorLine,
   parseBuddyMessage,
   parseClaudeStreamLine,
   parseCodexJsonLine
@@ -32,6 +34,71 @@ describe('buddy actor parsers', () => {
     expect(event).toMatchObject({
       text: 'done',
       threadId: 'codex-thread'
+    })
+  })
+
+  it('extracts text from current Codex item.completed agent messages', () => {
+    const event = parseCodexJsonLine(JSON.stringify({
+      type: 'item.completed',
+      item: {
+        type: 'agent_message',
+        text: '{"type":"chat","content":"review complete"}'
+      }
+    }))
+
+    expect(event).toMatchObject({
+      text: '{"type":"chat","content":"review complete"}'
+    })
+  })
+
+  it('extracts OpenCode session IDs and text chunks while ignoring reasoning', () => {
+    const session = parseActorLine('opencode', JSON.stringify({
+      type: 'step_start',
+      sessionID: 'opencode-session',
+      part: { type: 'step-start' }
+    }))
+    const text = parseActorLine('opencode', JSON.stringify({
+      type: 'text',
+      sessionID: 'opencode-session',
+      part: { type: 'text', text: 'Hello' }
+    }))
+    const reasoning = extractActorOutput('opencode', JSON.stringify({
+      type: 'reasoning',
+      sessionID: 'opencode-session',
+      part: { type: 'reasoning', text: 'hidden' }
+    }))
+
+    expect(session).toMatchObject({ sessionId: 'opencode-session' })
+    expect(text).toMatchObject({ sessionId: 'opencode-session', text: 'Hello' })
+    expect(reasoning).toBe('')
+  })
+
+  it('keeps OpenCode JSON chunks adjacent when extracting output', () => {
+    const output = extractActorOutput('opencode', [
+      JSON.stringify({ type: 'text', sessionID: 's1', part: { type: 'text', text: '{"type":"ch' } }),
+      JSON.stringify({ type: 'text', sessionID: 's1', part: { type: 'text', text: 'at","content":"hi"}' } })
+    ].join('\n'))
+
+    expect(output).toBe('{"type":"chat","content":"hi"}')
+  })
+
+  it('keeps only the last Kimi assistant content when extracting output', () => {
+    const output = extractActorOutput('kimi', [
+      JSON.stringify({ role: 'assistant', content: '{"type":"chat","content":"Part one"}' }),
+      JSON.stringify({ role: 'tool', content: 'tool result' }),
+      JSON.stringify({ role: 'assistant', content: '{"type":"chat","content":"Part two"}' })
+    ].join('\n'))
+
+    expect(output).toBe('{"type":"chat","content":"Part two"}')
+  })
+
+  it('extracts stable sessions from buddy.session events', () => {
+    expect(parseActorLine('kimi', JSON.stringify({
+      type: 'buddy.session',
+      actor: 'kimi',
+      session_id: 'kimi-session'
+    }))).toMatchObject({
+      sessionId: 'kimi-session'
     })
   })
 
