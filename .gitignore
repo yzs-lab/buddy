@@ -7,3 +7,5 @@ release
 .claude
 .pnpm-store
 .worktrees
+test-results
+playwright-report

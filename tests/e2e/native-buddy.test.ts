@@ -1,0 +1,47 @@
+import { expect, test } from '@playwright/test'
+
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'buddy', {
+      value: {
+        checkHealth: async () => true,
+        bootstrap: async () => ({
+          version: 'native',
+          repo_root: '',
+          data_root: '',
+          tasks: []
+        }),
+        getTasks: async () => [],
+        getTaskDetail: async () => {
+          throw new Error('not found')
+        },
+        createTask: async () => ({ task: 'demo', path: '/tmp/demo', workspace_key: 'abc123def456' }),
+        deleteTask: async () => undefined,
+        startTask: async () => undefined,
+        sendMessage: async () => undefined,
+        skipCountdown: async () => undefined,
+        pauseCountdown: async () => undefined,
+        interrupt: async () => undefined,
+        getEvents: async () => ({ events: [] }),
+        updateGlobalSettings: async (settings: unknown) => settings,
+        onTaskEvent: () => () => undefined
+      }
+    })
+    Object.defineProperty(window, 'api', {
+      value: {
+        selectDirectory: async () => null,
+        openInFinder: async () => undefined,
+        onFullScreenChange: () => () => undefined,
+        isFullScreen: async () => false
+      }
+    })
+  })
+})
+
+test('app boots with native buddy backend', async ({ page }) => {
+  await page.goto('/')
+
+  await expect(page.getByText('buddy').first()).toBeVisible()
+  await expect(page.locator('text=新建任务')).toBeVisible()
+  await expect(page.locator('text=buddy 服务未运行')).not.toBeVisible()
+})

@@ -8,7 +8,7 @@
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "test": "vitest run tests/unit",
-    "test:e2e": "playwright test",
+    "test:e2e": "sh scripts/run-e2e.sh",
     "typecheck": "tsc --noEmit",
     "package": "electron-builder --mac",
     "package:dir": "electron-builder --mac --dir"
