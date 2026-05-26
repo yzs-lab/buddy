@@ -108,4 +108,34 @@ describe('buddy actor parsers', () => {
       reason: 'done'
     })
   })
+
+  it('unwraps buddy JSON chat and break envelopes', () => {
+    expect(parseBuddyMessage('```json\n{"type":"chat","content":"hello"}\n```')).toMatchObject({
+      kind: 'message',
+      text: 'hello'
+    })
+    expect(parseBuddyMessage('{"type":"break","content":"done"}')).toMatchObject({
+      kind: 'break',
+      content: 'done'
+    })
+  })
+
+  it('preserves markdown content from buddy JSON envelopes', () => {
+    const markdown = '## Summary\n\n- Updated `src/main`\n- Kept transcript JSONL compatible\n'
+    const message = parseBuddyMessage(JSON.stringify({ type: 'chat', content: markdown }))
+
+    expect(message).toEqual({
+      kind: 'message',
+      text: markdown
+    })
+  })
+
+  it('loosely extracts markdown content with unescaped quotes like buddy-python', () => {
+    const message = parseBuddyMessage('```json\n{"type": "chat", "content": "## 结果\n\n这是一段包含"引号"的 markdown"}\n```')
+
+    expect(message).toEqual({
+      kind: 'message',
+      text: '## 结果\n\n这是一段包含"引号"的 markdown'
+    })
+  })
 })

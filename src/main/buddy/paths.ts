@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { realpathSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
 
 export interface BuddyPaths {
@@ -34,4 +35,13 @@ export function workspaceDir(paths: BuddyPaths, workspaceKey: string): string {
 
 export function taskDir(paths: BuddyPaths, workspaceKey: string, taskId: string): string {
   return join(workspaceDir(paths, workspaceKey), 'tasks', taskId)
+}
+
+export function canonicalRepoRoot(repoRoot: string): string {
+  const root = resolve(repoRoot)
+  try {
+    return realpathSync.native(root)
+  } catch {
+    return root
+  }
 }

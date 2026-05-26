@@ -32,31 +32,47 @@ export interface TaskDetail {
 }
 
 export interface TaskState {
+  protocol_version?: string
+  task_id?: string
+  repo_root?: string
   status: TaskStatus
   round: number
+  rounds_in_window?: number
   next_actor: string
-  countdown?: Countdown
+  countdown?: Countdown | null
   active_run?: ActiveRun | null
-  claude_session_id?: string
-  codex_thread_id?: string
-  opencode_session_id?: string
-  kimi_session_id?: string
+  claude_session_id?: string | null
+  codex_thread_id?: string | null
+  opencode_session_id?: string | null
+  kimi_session_id?: string | null
+  context_hash?: string
+  context_sent?: Record<string, boolean>
+  event_seq?: number
+  transcript_seq?: number
+  consecutive_failures?: number
+  last_error?: Failure | null
+  created_at?: string
   updated_at?: string
-  repo_root?: string
-  pending_break?: { actor?: string } | null
+  pending_break?: { actor?: string; round?: number } | null
   latest_failure?: Failure | null
 }
 
 export interface Countdown {
   status: 'running' | 'paused' | 'elapsed' | 'skipped' | 'expired'
-  remaining: number
+  remaining?: number
+  started_at?: string
+  after_actor?: string
   default_next_actor: string
   deadline?: string
 }
 
 export interface ActiveRun {
+  run_id?: string
   actor: string
   started_at: string
+  status?: 'running'
+  session_id_before?: string | null
+  session_id_after?: string | null
 }
 
 export interface TaskSettings {
@@ -68,6 +84,11 @@ export interface TaskSettings {
   implementer_actor?: string
   reviewer_actor?: string
   max_rounds?: number
+  max_consecutive_failures?: number
+  seed_claude_session_id?: string
+  seed_codex_thread_id?: string
+  seed_opencode_session_id?: string
+  seed_kimi_session_id?: string
 }
 
 export interface Launcher {
@@ -86,9 +107,11 @@ export interface TranscriptEntry {
 
 export interface Event {
   seq: number
+  task_id?: string
   type: string
   actor?: string
   ts: string
+  run_id?: string
   payload: Record<string, unknown>
 }
 
@@ -121,6 +144,8 @@ export interface GlobalSettings {
   max_rounds?: number
   max_consecutive_failures?: number
   launchers?: Record<string, Launcher>
+  seed_claude_session_id?: string
+  seed_codex_thread_id?: string
 }
 
 export interface BuddyError {

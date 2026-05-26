@@ -95,6 +95,10 @@ body {
   border-left-color: var(--fg-secondary);
   background: var(--bg-subtle);
 }
+.msg-system {
+  border-left-color: var(--fg-muted);
+  background: color-mix(in srgb, var(--fg-muted) 6%, var(--bg-elevated));
+}
 .msg-default {
   border-left-color: var(--border);
 }
@@ -113,6 +117,7 @@ body {
 .msg-opencode .role { color: #d97706; }
 .msg-kimi .role { color: #2e7d32; }
 .msg-human .role { color: var(--fg); }
+.msg-system .role { color: var(--fg-muted); }
 
 /* ===== 轮次通知消息 ===== */
 .message.round-notice {

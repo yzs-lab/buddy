@@ -15,11 +15,11 @@ describe('BuddyStore settings and delete', () => {
       max_rounds: 10,
       max_consecutive_failures: 3,
       launchers: {
-        claude: { command: 'claude --dangerously-skip-permissions', env: {}, timeout_seconds: 7200 },
-        codex: { command: 'codex', env: {}, timeout_seconds: 7200 },
-        opencode: { command: 'opencode', env: {}, timeout_seconds: 7200 },
-        kimi: { command: 'kimi', env: {}, timeout_seconds: 7200 }
-      }
+        claude: { command: '', env: {}, timeout_seconds: 7200 },
+        codex: { command: '', env: {}, timeout_seconds: 7200 }
+      },
+      seed_claude_session_id: '',
+      seed_codex_thread_id: ''
     })
   })
 
@@ -29,11 +29,11 @@ describe('BuddyStore settings and delete', () => {
 
     await store.updateGlobalSettings({ countdown_seconds: 45 })
 
-    await expect(readFile(join(root, 'global', 'settings.json'), 'utf8')).resolves.toContain('"countdown_seconds":45')
+    await expect(readFile(join(root, 'global', 'settings.json'), 'utf8')).resolves.toContain('"countdown_seconds": 45')
     await expect(store.readGlobalSettings()).resolves.toMatchObject({
       countdown_seconds: 45,
       launchers: {
-        claude: expect.objectContaining({ command: 'claude --dangerously-skip-permissions' })
+        claude: expect.objectContaining({ command: '' })
       }
     })
   })

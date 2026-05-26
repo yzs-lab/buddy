@@ -28,6 +28,7 @@ export default function App() {
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('general')
   const [autoStartSeconds, setAutoStartSeconds] = useState(0)
   const autoStartTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const autoSkipCountdownRef = useRef<string | null>(null)
   const [isFullScreen, setIsFullScreen] = useState(false)
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [projectNames, setProjectNames] = useState<Record<string, string>>(() => {
@@ -263,6 +264,34 @@ export default function App() {
     }
   }, [autoStartSeconds, taskDetail?.state?.status])
 
+  // Auto-skip countdown when its deadline elapses so the next actor runs without manual click
+  useEffect(() => {
+    if (!selectedTaskId) return
+    const status = taskDetail?.state?.status
+    const countdown = taskDetail?.state?.countdown
+    if (status !== 'COUNTDOWN' || countdown?.status !== 'running' || !countdown.deadline) return
+
+    const countdownKey = `${selectedWorkspaceKey ?? ''}:${selectedTaskId}:${countdown.deadline}`
+    const remainingMs = Math.max(0, new Date(countdown.deadline).getTime() - Date.now())
+    const timer = setTimeout(() => {
+      if (autoSkipCountdownRef.current === countdownKey) return
+      autoSkipCountdownRef.current = countdownKey
+      skipCountdown.mutate({
+        taskId: selectedTaskId,
+        data: { workspace_key: selectedWorkspaceKey ?? undefined }
+      })
+    }, remainingMs)
+
+    return () => clearTimeout(timer)
+  }, [
+    selectedTaskId,
+    selectedWorkspaceKey,
+    taskDetail?.state?.status,
+    taskDetail?.state?.countdown?.status,
+    taskDetail?.state?.countdown?.deadline,
+    skipCountdown
+  ])
+
   const handleSidebarResize = useCallback((delta: number) => {
     setSidebarWidth(prev => {
       const next = prev + delta
@@ -312,6 +341,7 @@ export default function App() {
         {/* 标题栏 */}
         <TitleBar
           taskName={taskDetail?.task_id ?? ''}
+          taskStatus={taskDetail?.state?.status ?? null}
           isSidebarOpen={isSidebarOpen}
           isStatusBarOpen={isStatusBarOpen}
           isFullScreen={isFullScreen}
@@ -319,6 +349,8 @@ export default function App() {
           bare={view === 'settings'}
           onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
           onToggleStatusBar={() => setIsStatusBarOpen(!isStatusBarOpen)}
+          onRetry={() => handleStartTask()}
+          onResume={() => handleStartTask()}
         />
 
         {/* 主内容区 */}

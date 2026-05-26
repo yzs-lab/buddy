@@ -28,8 +28,39 @@ describe('buddy schemas', () => {
     })
 
     expect(state.status).toBe('PAUSED')
-    expect(state.countdown).toBeUndefined()
-    expect(state.claude_session_id).toBeUndefined()
+    expect(state.countdown).toBeNull()
+    expect(state.claude_session_id).toBeNull()
+  })
+
+  it('preserves buddy-python state fields', () => {
+    const state = parseTaskState({
+      protocol_version: '1',
+      task_id: 'demo',
+      repo_root: '/tmp/repo',
+      status: 'READY',
+      round: 0,
+      rounds_in_window: 0,
+      next_actor: 'claude',
+      claude_session_id: null,
+      codex_thread_id: null,
+      context_hash: 'abc',
+      context_sent: { claude: false, codex: false },
+      active_run: null,
+      countdown: null,
+      last_error: null,
+      event_seq: 1,
+      transcript_seq: 0,
+      consecutive_failures: 0,
+      created_at: '2026-05-26T11:11:27Z',
+      updated_at: '2026-05-26T11:11:27Z'
+    })
+
+    expect(state.task_id).toBe('demo')
+    expect(state.rounds_in_window).toBe(0)
+    expect(state.context_sent?.claude).toBe(false)
+    expect(state.event_seq).toBe(1)
+    expect(state.transcript_seq).toBe(0)
+    expect(state.last_error).toBeNull()
   })
 
   it('accepts legacy countdown objects without remaining seconds', () => {
@@ -52,9 +83,10 @@ describe('buddy schemas', () => {
   })
 
   it('parses event json lines', () => {
-    const event = parseEventLine('{"seq":1,"type":"task.created","ts":"2026-05-26T00:00:00.000Z","payload":{}}')
+    const event = parseEventLine('{"seq":1,"task_id":"demo","type":"task.created","ts":"2026-05-26T00:00:00.000Z","payload":{}}')
 
     expect(event.seq).toBe(1)
+    expect(event.task_id).toBe('demo')
     expect(event.type).toBe('task.created')
   })
 

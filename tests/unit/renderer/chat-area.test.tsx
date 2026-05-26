@@ -37,7 +37,39 @@ function readyTask(round: number): TaskDetail {
   }
 }
 
+function runningTask(): TaskDetail {
+  const task = readyTask(1)
+  return {
+    ...task,
+    state: {
+      ...task.state,
+      status: 'RUNNING_CLAUDE',
+      active_run: {
+        actor: 'claude',
+        started_at: '2026-05-26T07:06:50.471Z'
+      }
+    }
+  }
+}
+
 describe('ChatArea ready task controls', () => {
+  it('shows the task brief before the running status for a new running task', () => {
+    const html = renderToStaticMarkup(
+      <ChatArea
+        task={runningTask()}
+        onSendMessage={() => {}}
+        onStartTask={() => {}}
+        onInterrupt={() => {}}
+        autoStartSeconds={0}
+        draft=""
+        onDraftChange={() => {}}
+      />
+    )
+
+    expect(html).toContain('Make the user message card wider.')
+    expect(html.indexOf('Make the user message card wider.')).toBeLessThan(html.indexOf('running-status'))
+  })
+
   it('shows the start control for a newly-created READY task at round 1', () => {
     const html = renderToStaticMarkup(
       <ChatArea

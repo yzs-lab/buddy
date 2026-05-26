@@ -5,6 +5,8 @@ import type {
   CountdownInput,
   SendMessageInput,
   StartTaskInput,
+  TranscriptEntry,
+  TaskSettings,
   TaskState
 } from '../../shared/types'
 import { buildLauncherCommand, commandKindFor, runLauncher, type LauncherCommandKind } from './launchers'
@@ -46,15 +48,30 @@ export class BuddyRunner {
     if (!status) throw new Error(`Unsupported actor: ${actor}`)
     const runId = `run_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`
     const startedAt = new Date().toISOString()
+    const sessionBefore = sessionIdForActor(actor, detail.state) ?? seedSessionIdForActor(actor, detail.settings) ?? null
 
     await this.store.updateTaskState(taskId, workspaceKey, (state) => {
-      if (state.status !== 'READY' && state.status !== 'PAUSED' && state.status !== 'FAILED') {
+      if (
+        state.status !== 'READY' &&
+        state.status !== 'PAUSED' &&
+        state.status !== 'FAILED' &&
+        state.status !== 'COUNTDOWN' &&
+        state.status !== 'DONE'
+      ) {
         throw new Error(`Cannot start task from ${state.status}`)
       }
       return {
         ...state,
         status,
-        active_run: { actor, started_at: startedAt },
+        active_run: {
+          run_id: runId,
+          actor,
+          started_at: startedAt,
+          status: 'running',
+          session_id_before: sessionBefore,
+          session_id_after: null
+        },
+        countdown: null,
         latest_failure: null,
         updated_at: startedAt
       }
@@ -62,7 +79,8 @@ export class BuddyRunner {
     await this.store.appendTaskEvent(taskId, workspaceKey, {
       type: 'actor.started',
       actor,
-      payload: { run_id: runId }
+      run_id: runId,
+      payload: { mode: sessionBefore ? 'resume' : 'start' }
     })
 
     if (!this.executeLaunchers) {
@@ -75,15 +93,24 @@ export class BuddyRunner {
 
   async sendMessage(taskId: string, input: SendMessageInput): Promise<void> {
     if (!input.workspace_key) throw new Error('workspace_key is required')
+    const message = input.message ?? ''
+    if (!message.trim()) throw new Error('message is required')
     await this.store.appendTranscript(
       taskId,
       input.workspace_key,
-      `\n\n## Human\n\n${input.message ?? ''}\n`
+      'human',
+      message,
+      { source: 'run_once' }
     )
     await this.store.appendTaskEvent(taskId, input.workspace_key, {
-      type: 'message.added',
+      type: 'human.message',
       actor: input.actor,
-      payload: { message: input.message ?? '' }
+      payload: { content: message }
+    })
+    await this.startTask(taskId, {
+      workspace_key: input.workspace_key,
+      actor: input.actor,
+      message
     })
   }
 
@@ -160,7 +187,7 @@ export class BuddyRunner {
     const eventFile = join(artifactsDir, `${runId}-events.jsonl`)
     await writeFile(promptFile, prompt)
     const cwd = await existingCwd(detail.state.repo_root)
-    const existingSessionId = sessionIdForActor(actor, detail.state)
+    const existingSessionId = sessionIdForActor(actor, detail.state) ?? seedSessionIdForActor(actor, detail.settings)
     const commandKind = commandKindFor(actor, launcher.command)
     const sessionId = actor === 'kimi' && commandKind === 'native_kimi' && !existingSessionId
       ? randomBytes(8).toString('hex')
@@ -188,6 +215,7 @@ export class BuddyRunner {
     })
 
     try {
+      const startedAtMs = Date.now()
       const result = await runLauncher({
         command: command.command,
         args: command.args,
@@ -200,6 +228,7 @@ export class BuddyRunner {
         },
         onStderr: (line) => stderrLines.push(line)
       })
+      const elapsedMs = Date.now() - startedAtMs
 
       const stdoutText = outputLines.join('\n')
       const rawEvents = await collectRawEvents(eventFile, stdoutText, command.kind)
@@ -213,11 +242,11 @@ export class BuddyRunner {
         throw new Error(stderrLines.join('\n') || `Actor exited with ${result.exitCode}`)
       }
 
-      await this.completeActor(taskId, workspaceKey, actor, runId, outputText, parsedLines)
+      await this.completeActor(taskId, workspaceKey, actor, runId, outputText, parsedLines, elapsedMs, result.exitCode ?? 0)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       const failureMessage = stderrLines.join('\n') || message
-      await this.markFailed(taskId, workspaceKey, actor, failureMessage)
+      await this.markFailed(taskId, workspaceKey, actor, failureMessage, runId)
       throw error
     } finally {
       await removeRunLock(lockPath)
@@ -230,7 +259,9 @@ export class BuddyRunner {
     actor: string,
     runId: string,
     outputText: string,
-    parsedLines: ParsedActorLine[]
+    parsedLines: ParsedActorLine[],
+    elapsedMs: number,
+    exitCode: number
   ): Promise<void> {
     const text = outputText
     const sessionId = lastValue(parsedLines.map((line) => line.sessionId))
@@ -238,19 +269,37 @@ export class BuddyRunner {
     const message = parseBuddyMessage(text)
     const detail = await this.store.getTaskDetail(taskId, workspaceKey)
     const nextActor = actor === 'claude' ? 'codex' : 'claude'
+    const round = (detail.state.round ?? 0) + 1
     const now = new Date().toISOString()
+    const buddyType = message.kind === 'break' ? 'break' : 'chat'
+    const transcriptContent = message.kind === 'break' ? message.content : message.text
+    const pendingBreak = detail.state.pending_break
+    const breakConfirmed = message.kind === 'break' && Boolean(pendingBreak?.actor && pendingBreak.actor !== actor)
+    const breakPending = message.kind === 'break' && !breakConfirmed
+    const breakRejected = message.kind !== 'break' && Boolean(pendingBreak?.actor)
 
-    await this.store.appendTranscript(taskId, workspaceKey, `\n\n## ${actor}\n\n${text}\n`)
+    await this.store.appendTranscript(taskId, workspaceKey, normalizeActorRole(actor), transcriptContent, {
+      round,
+      run_id: runId,
+      elapsed_ms: elapsedMs,
+      buddy_type: buddyType
+    })
     await this.store.appendTaskEvent(taskId, workspaceKey, {
       type: 'actor.completed',
       actor,
-      payload: { run_id: runId, text }
+      run_id: runId,
+      payload: { run_id: runId, text: transcriptContent, raw_text: text, buddy_type: buddyType }
     })
 
     await this.store.updateTaskState(taskId, workspaceKey, (state) => {
+      const nextRound = (state.round ?? 0) + 1
       const next: TaskState = {
         ...state,
         active_run: null,
+        round: nextRound,
+        rounds_in_window: (state.rounds_in_window ?? 0) + 1,
+        consecutive_failures: 0,
+        last_error: null,
         updated_at: now
       }
       if (actor === 'claude' && sessionId) next.claude_session_id = sessionId
@@ -258,23 +307,25 @@ export class BuddyRunner {
       if (actor === 'opencode' && sessionId) next.opencode_session_id = sessionId
       if (actor === 'kimi' && sessionId) next.kimi_session_id = sessionId
 
-      if (message.kind === 'break') {
-        if (detail.state.pending_break?.actor && detail.state.pending_break.actor !== actor) {
-          return {
-            ...next,
-            status: 'DONE',
-            countdown: undefined,
-            pending_break: null
-          }
+      if (breakConfirmed) {
+        return {
+          ...next,
+          status: 'DONE',
+          countdown: null,
+          pending_break: null
         }
+      }
+
+      if (breakPending) {
         return {
           ...next,
           status: 'COUNTDOWN',
           next_actor: nextActor,
-          pending_break: { actor },
+          pending_break: { actor, round: nextRound },
           countdown: {
             status: 'running',
-            remaining: detail.settings.countdown_seconds,
+            started_at: now,
+            after_actor: actor,
             default_next_actor: nextActor,
             deadline: new Date(Date.now() + detail.settings.countdown_seconds * 1000).toISOString()
           }
@@ -285,17 +336,95 @@ export class BuddyRunner {
         ...next,
         status: 'COUNTDOWN',
         next_actor: nextActor,
+        pending_break: breakRejected ? null : next.pending_break,
         countdown: {
           status: 'running',
-          remaining: detail.settings.countdown_seconds,
+          started_at: now,
+          after_actor: actor,
           default_next_actor: nextActor,
           deadline: new Date(Date.now() + detail.settings.countdown_seconds * 1000).toISOString()
         }
       }
     })
+
+    if (breakConfirmed) {
+      await this.store.appendTaskEvent(taskId, workspaceKey, {
+        type: 'actor.finished',
+        actor,
+        run_id: runId,
+        payload: { elapsed_ms: elapsedMs, exit_code: exitCode, buddy_type: 'break_confirmed' }
+      })
+      await this.store.appendTranscript(
+        taskId,
+        workspaceKey,
+        'system',
+        `${actorDisplayName(pendingBreak?.actor)} 和 ${actorDisplayName(actor)} 均确认任务完成，任务结束。`,
+        { kind: 'round_notice', round }
+      )
+      await this.store.appendTaskEvent(taskId, workspaceKey, {
+        type: 'task.done',
+        payload: {
+          reason: 'dual_break_confirmed',
+          first_actor: pendingBreak?.actor,
+          second_actor: actor,
+          round
+        }
+      })
+      return
+    }
+
+    if (breakPending) {
+      await this.store.appendTranscript(
+        taskId,
+        workspaceKey,
+        'system',
+        `${actorDisplayName(actor)} 请求结束任务，等待 ${actorDisplayName(nextActor)} 确认。`,
+        { kind: 'round_notice', round }
+      )
+      await this.store.appendTaskEvent(taskId, workspaceKey, {
+        type: 'break.pending',
+        actor,
+        run_id: runId,
+        payload: {
+          elapsed_ms: elapsedMs,
+          exit_code: exitCode,
+          buddy_type: 'break',
+          pending_confirmation_from: nextActor
+        }
+      })
+    } else if (breakRejected) {
+      await this.store.appendTaskEvent(taskId, workspaceKey, {
+        type: 'break.rejected',
+        actor,
+        run_id: runId,
+        payload: { rejected_break_from: pendingBreak?.actor }
+      })
+      await this.store.appendTranscript(
+        taskId,
+        workspaceKey,
+        'system',
+        `${actorDisplayName(actor)} 认为任务尚未完成，${actorDisplayName(pendingBreak?.actor)} 的结束请求已撤回。`,
+        { kind: 'round_notice', round }
+      )
+    }
+
+    await this.store.appendTaskEvent(taskId, workspaceKey, {
+      type: 'actor.finished',
+      actor,
+      run_id: runId,
+      payload: { elapsed_ms: elapsedMs, exit_code: exitCode, buddy_type: buddyType }
+    })
+    await this.store.appendTaskEvent(taskId, workspaceKey, {
+      type: 'countdown.started',
+      payload: {
+        seconds: detail.settings.countdown_seconds,
+        after_actor: actor,
+        default_next_actor: nextActor
+      }
+    })
   }
 
-  private async markFailed(taskId: string, workspaceKey: string, actor: string, message: string): Promise<void> {
+  private async markFailed(taskId: string, workspaceKey: string, actor: string, message: string, runId?: string): Promise<void> {
     const failure = {
       message,
       actor,
@@ -311,17 +440,39 @@ export class BuddyRunner {
     await this.store.appendTaskEvent(taskId, workspaceKey, {
       type: 'actor.failed',
       actor,
-      payload: { error: message }
+      run_id: runId,
+      payload: { error: message, run_id: runId }
     })
   }
 }
 
 function sessionIdForActor(actor: string, state: TaskState): string | undefined {
-  if (actor === 'claude') return state.claude_session_id
-  if (actor === 'codex') return state.codex_thread_id
-  if (actor === 'opencode') return state.opencode_session_id
-  if (actor === 'kimi') return state.kimi_session_id
+  if (actor === 'claude') return state.claude_session_id ?? undefined
+  if (actor === 'codex') return state.codex_thread_id ?? undefined
+  if (actor === 'opencode') return state.opencode_session_id ?? undefined
+  if (actor === 'kimi') return state.kimi_session_id ?? undefined
   return undefined
+}
+
+function seedSessionIdForActor(actor: string, settings: TaskSettings): string | undefined {
+  if (actor === 'claude') return settings.seed_claude_session_id || undefined
+  if (actor === 'codex') return settings.seed_codex_thread_id || undefined
+  if (actor === 'opencode') return settings.seed_opencode_session_id || undefined
+  if (actor === 'kimi') return settings.seed_kimi_session_id || undefined
+  return undefined
+}
+
+function normalizeActorRole(actor: string): TranscriptEntry['role'] {
+  if (actor === 'claude' || actor === 'codex' || actor === 'opencode' || actor === 'kimi') return actor
+  return 'system'
+}
+
+function actorDisplayName(actor: unknown): string {
+  if (actor === 'claude') return 'Claude Code'
+  if (actor === 'codex') return 'Codex'
+  if (actor === 'opencode') return 'OpenCode'
+  if (actor === 'kimi') return 'Kimi'
+  return typeof actor === 'string' && actor ? actor : 'Unknown'
 }
 
 function lastValue(values: Array<string | undefined>): string | undefined {

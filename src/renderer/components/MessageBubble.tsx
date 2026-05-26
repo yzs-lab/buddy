@@ -24,17 +24,8 @@ export function MessageBubble({ entry }: MessageBubbleProps) {
   const meta = entry.meta || ({} as Record<string, unknown>)
   const isRoundNotice = isSystem && meta.kind === 'round_notice'
 
-  if (isSystem && !isRoundNotice) {
-    return (
-      <div className="flex justify-center my-2">
-        <div className="text-xs text-fg-muted bg-bg-muted px-3 py-1 rounded-full">
-          {decodeErrorText(entry.content)}
-        </div>
-      </div>
-    )
-  }
-
-  const html = renderMarkdown(entry.content)
+  const bodyText = isSystem && !isRoundNotice ? decodeErrorText(entry.content) : entry.content
+  const html = renderMarkdown(bodyText)
   const cls = roleClasses[entry.role] || 'msg-default'
   const metaText = formatMessageMeta(entry, lang)
 
@@ -46,7 +37,7 @@ export function MessageBubble({ entry }: MessageBubbleProps) {
 
   return (
     <div className={`flex mb-3 ${isHuman ? 'justify-end' : 'justify-start'}`}>
-      <div className={`message ${cls} ${isRoundNotice ? 'round-notice' : ''} ${isHuman ? 'min-w-[66%] max-w-[82%]' : 'w-full'}`}>
+      <div className={`message ${cls} ${isRoundNotice ? 'round-notice' : ''} ${isHuman ? 'min-w-[66.666667%] max-w-[82%]' : 'w-full'}`}>
         <div className="message-head">
           <span className="role">{roleLabel}</span>
           {metaText && <span>{metaText}</span>}

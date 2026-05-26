@@ -3,9 +3,9 @@ import { TaskDetail } from '../../shared/types'
 import { MessageBubble } from './MessageBubble'
 import { RunningStatusMessage } from './RunningStatusMessage'
 import { Composer } from './Composer'
-import { renderMarkdown } from '../lib/markdown'
 import { isTaskReadyToStart } from '../lib/taskState'
 import { useT } from '../hooks/useI18n'
+import { renderMarkdown } from '../lib/markdown'
 
 interface ChatAreaProps {
   task: TaskDetail | null
@@ -25,12 +25,13 @@ export function ChatArea({ task, onSendMessage, onStartTask, onInterrupt, autoSt
     if (transcriptRef.current) {
       transcriptRef.current.scrollTop = transcriptRef.current.scrollHeight
     }
-  }, [task?.transcript, task?.task_text, task?.state?.status, task?.state?.active_run?.actor])
+  }, [task?.transcript, task?.state?.status, task?.state?.active_run?.actor])
 
   const isRunning = task?.state?.status?.startsWith('RUNNING_') ?? false
   const isReady = isTaskReadyToStart(task?.state)
-  const taskText = (task?.task_text || '').trim()
   const hasTranscript = (task?.transcript?.length ?? 0) > 0
+  const taskText = (task?.task_text || '').trim()
+  const showTaskBrief = !!taskText && !hasTranscript
 
   return (
     <div className="flex-1 flex flex-col bg-bg-elevated min-w-0">
@@ -42,25 +43,22 @@ export function ChatArea({ task, onSendMessage, onStartTask, onInterrupt, autoSt
               <div className="text-sm">{t('chat.empty.desc')}</div>
             </div>
           </div>
-        ) : !hasTranscript && !taskText ? (
-          <div className="flex items-center justify-center h-full min-h-[60vh]">
-            <div className="text-center text-fg-muted">
-              <div className="text-lg font-medium mb-2">{t('chat.created.title')}</div>
-              <div className="text-sm">{t('chat.created.desc')}</div>
-            </div>
-          </div>
         ) : (
           <>
-            {taskText && (
-              <div className="flex mb-3 justify-start">
-                <div className="message msg-system w-full">
-                  <div className="message-head">
-                    <span className="role">{t('chat.taskBrief')}</span>
-                  </div>
-                  <div
-                    className="message-body"
-                    dangerouslySetInnerHTML={{ __html: renderMarkdown(taskText) }}
-                  />
+            {showTaskBrief && (
+              <div className="task-brief mb-3 rounded-lg border border-border-subtle bg-bg px-4 py-3">
+                <div className="text-xs font-medium text-fg-muted mb-2">{t('chat.taskBrief')}</div>
+                <div
+                  className="text-sm leading-relaxed text-fg"
+                  dangerouslySetInnerHTML={{ __html: renderMarkdown(taskText) }}
+                />
+              </div>
+            )}
+            {!hasTranscript && !isRunning && (
+              <div className="flex items-center justify-center h-full min-h-[45vh]">
+                <div className="text-center text-fg-muted">
+                  <div className="text-lg font-medium mb-2">{t('chat.created.title')}</div>
+                  <div className="text-sm">{t('chat.created.desc')}</div>
                 </div>
               </div>
             )}
