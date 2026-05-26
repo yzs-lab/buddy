@@ -1,6 +1,8 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import {
+  ChevronDown,
   ChevronLeft,
+  ChevronRight,
   Ellipsis,
   Folder,
   FolderOpen,
@@ -30,6 +32,21 @@ const STATUS_KEYS: Record<TaskStatus, TranslationKey> = {
   PAUSED: 'status.PAUSED',
   FAILED: 'status.FAILED',
   DONE: 'status.DONE',
+}
+
+function readStringArraySetting(key: string): string[] {
+  try {
+    if (typeof window === 'undefined') return []
+    const parsed = JSON.parse(window.localStorage?.getItem(key) || '[]')
+    return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === 'string') : []
+  } catch { return [] }
+}
+
+function writeStringArraySetting(key: string, value: string[]) {
+  try {
+    if (typeof window === 'undefined') return
+    window.localStorage?.setItem(key, JSON.stringify(value))
+  } catch {}
 }
 
 function statusText(status: TaskStatus, t: TFunction): string {
@@ -242,16 +259,23 @@ function ChatSidebar({
   const [renamingRepoRoot, setRenamingRepoRoot] = useState<string | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
 
-  const [pinnedTaskIds, setPinnedTaskIds] = useState<string[]>(() => {
-    try {
-      return JSON.parse(localStorage.getItem('buddy.pinnedTaskIds') || '[]')
-    } catch { return [] }
-  })
+  const [pinnedTaskIds, setPinnedTaskIds] = useState<string[]>(() => readStringArraySetting('buddy.pinnedTaskIds'))
+  const [collapsedProjectKeys, setCollapsedProjectKeys] = useState<string[]>(() => readStringArraySetting('buddy.collapsedProjectKeys'))
 
   const togglePin = useCallback((taskId: string) => {
     setPinnedTaskIds(prev => {
       const next = prev.includes(taskId) ? prev.filter(id => id !== taskId) : [...prev, taskId]
-      try { localStorage.setItem('buddy.pinnedTaskIds', JSON.stringify(next)) } catch {}
+      writeStringArraySetting('buddy.pinnedTaskIds', next)
+      return next
+    })
+  }, [])
+
+  const toggleProject = useCallback((projectKey: string) => {
+    setCollapsedProjectKeys(prev => {
+      const next = prev.includes(projectKey)
+        ? prev.filter(key => key !== projectKey)
+        : [...prev, projectKey]
+      writeStringArraySetting('buddy.collapsedProjectKeys', next)
       return next
     })
   }, [])
@@ -392,13 +416,30 @@ function ChatSidebar({
               const hasSelected = workspaceTasks.some(t => t.task_id === selectedTaskId)
               const repoRoot = workspaceTasks[0]?.repo_root || ''
               const isMenuOpen = openMenuRepoRoot === repoRoot
+              const isCollapsed = collapsedProjectKeys.includes(projectKey) && !hasSelected
+              const isExpanded = !isCollapsed
               return (
                 <div key={projectKey} className="mb-3">
                   <div
+                    role="button"
+                    tabIndex={0}
+                    aria-expanded={isExpanded}
+                    onClick={() => toggleProject(projectKey)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        toggleProject(projectKey)
+                      }
+                    }}
                     title={repoRoot || projectKey}
-                    className={`group flex items-center gap-2 px-2 py-1.5 text-sm rounded-md hover:bg-bg-subtle ${
+                    className={`group flex items-center gap-2 px-2 py-1.5 text-sm rounded-md hover:bg-bg-subtle cursor-pointer focus:outline-none focus:ring-1 focus:ring-accent ${
                     hasSelected ? 'text-fg font-medium' : 'text-fg-secondary'
                   }`}>
+                    {isExpanded ? (
+                      <ChevronDown size={13} strokeWidth={2} className="flex-shrink-0" />
+                    ) : (
+                      <ChevronRight size={13} strokeWidth={2} className="flex-shrink-0" />
+                    )}
                     <FolderIcon />
                     <span className="truncate flex-1">{projectKey}</span>
                     <div className="relative" ref={isMenuOpen ? menuRef : undefined}>
@@ -454,7 +495,7 @@ function ChatSidebar({
                       <SquarePlus size={14} strokeWidth={2} />
                     </button>
                   </div>
-                  {workspaceTasks.length === 0 ? (
+                  {!isExpanded ? null : workspaceTasks.length === 0 ? (
                     <div className="px-3 py-1.5 ml-2 text-xs text-fg-muted">{t('sidebar.noConversation')}</div>
                   ) : (
                     workspaceTasks.map((task) => {

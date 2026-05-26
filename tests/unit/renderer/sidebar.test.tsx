@@ -1,12 +1,74 @@
+// @vitest-environment jsdom
+
+import '@testing-library/jest-dom/vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Sidebar } from '../../../src/renderer/components/Sidebar'
 import type { Task } from '../../../src/shared/types'
 
 describe('Sidebar', () => {
-  afterEach(() => {
-    vi.useRealTimers()
+  beforeEach(() => {
+    const store = new Map<string, string>()
+    Object.defineProperty(window, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: vi.fn((key: string) => store.get(key) ?? null),
+        setItem: vi.fn((key: string, value: string) => store.set(key, value)),
+        removeItem: vi.fn((key: string) => store.delete(key)),
+        clear: vi.fn(() => store.clear())
+      }
+    })
   })
+
+  afterEach(() => {
+    cleanup()
+    vi.useRealTimers()
+    try { window.localStorage?.clear() } catch {}
+  })
+
+  function task(taskId: string, repoRoot = '/tmp/repo'): Task {
+    return {
+      task_id: taskId,
+      workspace_key: `${taskId}-workspace`,
+      status: 'READY',
+      updated_at: '2026-05-26T10:00:00.000Z',
+      repo_root: repoRoot,
+      round: 1,
+      active_run: null
+    }
+  }
+
+  function renderSidebar(tasks: Task[], overrides: Partial<React.ComponentProps<typeof Sidebar>> = {}) {
+    const props = {
+      isOpen: true,
+      width: 240,
+      tasks,
+      selectedTaskId: null,
+      isLoading: false,
+      error: null,
+      isHealthy: true,
+      view: 'chat' as const,
+      settingsTab: 'general' as const,
+      onSelectTask: vi.fn(),
+      onCreateTask: vi.fn(),
+      onDeleteTask: vi.fn(),
+      onOpenSettings: vi.fn(),
+      onBackToApp: vi.fn(),
+      onSelectSettingsTab: vi.fn(),
+      onResize: vi.fn(),
+      onToggleSidebar: vi.fn(),
+      isFullScreen: false,
+      onRenameProject: vi.fn(),
+      onOpenInFinder: vi.fn(),
+      onRemoveProject: vi.fn(),
+      projectNames: {},
+      ...overrides
+    }
+
+    render(<Sidebar {...props} />)
+    return props
+  }
 
   it('does not show task round numbers in the task list', () => {
     const tasks: Task[] = [{
@@ -97,5 +159,53 @@ describe('Sidebar', () => {
 
     expect(html).toContain('running demo')
     expect(html).not.toContain('14s')
+  })
+
+  it('collapses and expands a project when clicking the project row', () => {
+    renderSidebar([task('first'), task('second')])
+
+    const projectRow = screen.getByRole('button', { name: /repo/ })
+    expect(projectRow).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('first')).toBeTruthy()
+    expect(screen.getByText('second')).toBeTruthy()
+
+    fireEvent.click(projectRow)
+
+    expect(projectRow).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByText('first')).toBeNull()
+    expect(screen.queryByText('second')).toBeNull()
+
+    fireEvent.click(projectRow)
+
+    expect(projectRow).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('first')).toBeTruthy()
+    expect(screen.getByText('second')).toBeTruthy()
+  })
+
+  it('keeps the project collapse state when clicking project actions', () => {
+    const props = renderSidebar([task('first'), task('second')])
+    const projectRow = screen.getByRole('button', { name: /repo/ })
+
+    fireEvent.click(projectRow)
+    expect(projectRow).toHaveAttribute('aria-expanded', 'false')
+
+    fireEvent.click(screen.getByTitle('More actions'))
+    expect(projectRow).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByText('first')).toBeNull()
+
+    fireEvent.click(screen.getByTitle('New task in this project'))
+    expect(props.onCreateTask).toHaveBeenCalledWith('/tmp/repo')
+    expect(projectRow).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByText('second')).toBeNull()
+  })
+
+  it('keeps the selected task project expanded even when the project was persisted collapsed', () => {
+    window.localStorage.setItem('buddy.collapsedProjectKeys', JSON.stringify(['repo']))
+
+    renderSidebar([task('first'), task('second')], { selectedTaskId: 'first' })
+
+    expect(screen.getByRole('button', { name: /repo/ })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('first')).toBeTruthy()
+    expect(screen.getByText('second')).toBeTruthy()
   })
 })

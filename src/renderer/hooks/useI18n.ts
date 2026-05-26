@@ -14,30 +14,46 @@ const SEND_SHORTCUT_KEY = 'buddy.sendShortcut'
 const LANGUAGE_EVENT = 'buddy.language-change'
 const SEND_SHORTCUT_EVENT = 'buddy.sendShortcut-change'
 
-function readLanguagePref(): LanguagePref {
+function getStoredValue(key: string): string | null {
   try {
-    const v = localStorage.getItem(LANGUAGE_KEY)
-    if (v === 'auto' || v === 'zh-CN' || v === 'zh-TW' || v === 'en') return v
+    if (typeof window === 'undefined') return null
+    return window.localStorage?.getItem(key) ?? null
+  } catch { return null }
+}
+
+function setStoredValue(key: string, value: string) {
+  try {
+    if (typeof window === 'undefined') return
+    window.localStorage?.setItem(key, value)
   } catch {}
+}
+
+function dispatchWindowEvent(eventName: string) {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(eventName))
+  }
+}
+
+function readLanguagePref(): LanguagePref {
+  const v = getStoredValue(LANGUAGE_KEY)
+  if (v === 'auto' || v === 'zh-CN' || v === 'zh-TW' || v === 'en') return v
   return 'auto'
 }
 
 function readSendShortcut(): SendShortcut {
-  try {
-    const v = localStorage.getItem(SEND_SHORTCUT_KEY)
-    if (v === 'enter' || v === 'shift-enter') return v
-  } catch {}
+  const v = getStoredValue(SEND_SHORTCUT_KEY)
+  if (v === 'enter' || v === 'shift-enter') return v
   return 'shift-enter'
 }
 
 function writeLanguagePref(pref: LanguagePref) {
-  try { localStorage.setItem(LANGUAGE_KEY, pref) } catch {}
-  window.dispatchEvent(new CustomEvent(LANGUAGE_EVENT))
+  setStoredValue(LANGUAGE_KEY, pref)
+  dispatchWindowEvent(LANGUAGE_EVENT)
 }
 
 function writeSendShortcut(value: SendShortcut) {
-  try { localStorage.setItem(SEND_SHORTCUT_KEY, value) } catch {}
-  window.dispatchEvent(new CustomEvent(SEND_SHORTCUT_EVENT))
+  setStoredValue(SEND_SHORTCUT_KEY, value)
+  dispatchWindowEvent(SEND_SHORTCUT_EVENT)
 }
 
 function useLocalStorageBacked<T>(read: () => T, eventName: string): [T, (next: T) => void] {
