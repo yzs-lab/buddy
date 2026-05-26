@@ -17,10 +17,20 @@ describe('BuddyRunner countdown', () => {
     }))
     const runner = new BuddyRunner(store)
 
-    await runner.pauseCountdown('demo', { workspace_key: created.workspace_key })
+    await runner.pauseCountdown('demo', {
+      workspace_key: created.workspace_key,
+      next_actor: 'claude'
+    })
 
     const detail = await store.getTaskDetail('demo', created.workspace_key)
     expect(detail.state.status).toBe('READY')
+    expect(detail.state.next_actor).toBe('claude')
     expect(detail.state.countdown?.status).toBe('paused')
+    expect(detail.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'countdown.paused',
+        payload: expect.objectContaining({ next_actor: 'claude' })
+      })
+    ]))
   })
 })

@@ -118,7 +118,10 @@ export interface Event {
 export interface Failure {
   message: string
   actor?: string
+  run_id?: string
   ts?: string
+  output_file?: string
+  event_file?: string
 }
 
 export interface HealthResponse {

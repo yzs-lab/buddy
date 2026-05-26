@@ -30,6 +30,8 @@ interface TaskMeta {
   context_text?: string
 }
 
+const ACTORS = ['claude', 'codex', 'opencode', 'kimi'] as const
+
 export class BuddyStore {
   constructor(public readonly dataRoot: string) {}
 
@@ -77,7 +79,7 @@ export class BuddyStore {
       context_text: meta.context_text ?? '',
       transcript: await this.readTranscript(taskId, workspaceKey),
       events,
-      latest_failure: state.latest_failure ?? null
+      latest_failure: state.latest_failure ?? state.last_error ?? null
     }
   }
 
@@ -445,6 +447,8 @@ function defaultTaskSettings(
     launchers,
     seed_claude_session_id: normalizedGlobal.seed_claude_session_id ?? '',
     seed_codex_thread_id: normalizedGlobal.seed_codex_thread_id ?? '',
+    seed_opencode_session_id: '',
+    seed_kimi_session_id: '',
     ...restOverrides
   } as TaskSettings
 }
@@ -478,7 +482,8 @@ function defaultTaskState(
   contextText: string,
   now: string
 ): TaskState {
-  const initialActor = settings.role_mode === 'codex_implements' ? 'codex' : 'claude'
+  const initialActor = settings.implementer_actor
+    || (settings.role_mode === 'codex_implements' ? 'codex' : 'claude')
   return {
     protocol_version: '1',
     task_id: taskId,
@@ -489,11 +494,14 @@ function defaultTaskState(
     next_actor: initialActor,
     claude_session_id: null,
     codex_thread_id: null,
+    opencode_session_id: null,
+    kimi_session_id: null,
     context_hash: sha256Hex(contextText),
-    context_sent: { claude: false, codex: false },
+    context_sent: Object.fromEntries(ACTORS.map((actor) => [actor, false])),
     active_run: null,
     countdown: null,
     last_error: null,
+    latest_failure: null,
     event_seq: 0,
     transcript_seq: 0,
     consecutive_failures: 0,

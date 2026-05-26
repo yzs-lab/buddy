@@ -1,4 +1,37 @@
-import type { TranscriptEntry } from '../../shared/types'
+import { createHash } from 'node:crypto'
+import type { TaskSettings, TaskState, TranscriptEntry } from '../../shared/types'
+
+const ACTOR_CLAUDE = 'claude'
+const ACTOR_CODEX = 'codex'
+const ACTOR_OPENCODE = 'opencode'
+const ACTOR_KIMI = 'kimi'
+const ROLE_MODE_CODEX_IMPL = 'codex_implements'
+
+export const BUDDY_MESSAGE_PROTOCOL = `## Buddy Message Protocol
+
+Your output is parsed by the buddy orchestrator. Wrap your response in the following JSON structure:
+
+\`\`\`json
+{
+  "type": "chat",
+  "content": "your response text here"
+}
+\`\`\`
+
+- **type=chat**: Normal continuation. The loop proceeds to the next actor.
+- **type=break**: Request to end the task. The other actor must also confirm with \`type=break\` before the task transitions to DONE.
+
+Rules:
+- Always output valid JSON matching this structure.
+- Output raw JSON only - do NOT wrap it in a Markdown code block, and do NOT add any text before or after the JSON.
+- Avoid unescaped double quotes inside \`content\`; use single quotes or escape them.
+- Use \`type=break\` when: the task is fully completed, you are blocked and need human input, or continuing would be counterproductive.
+- Use \`type=chat\` for all normal responses.
+- The \`content\` field contains your actual response (markdown is fine).
+
+## Dual confirmation
+
+When one actor signals \`type=break\`, the task does NOT end immediately. The other actor must also confirm with \`type=break\` before the task transitions to DONE. If the other actor responds with \`type=chat\` instead, the break request is withdrawn and work continues.`
 
 export interface BuildActorPromptInput {
   actor: string
@@ -7,23 +40,177 @@ export interface BuildActorPromptInput {
   taskText: string
   contextText: string
   transcript: TranscriptEntry[]
+  settings?: Partial<TaskSettings>
+  state?: Partial<TaskState>
+  userMessage?: string
 }
 
 export function buildActorPrompt(input: BuildActorPromptInput): string {
-  return [
-    `You are ${input.actor} in a Buddy engineering loop.`,
-    `Round: ${input.round}`,
-    `Repository: ${input.repoRoot}`,
+  const taskText = input.taskText.trim()
+  const contextText = input.contextText.trim()
+  const state = input.state ?? {}
+  const settings = input.settings ?? {}
+  const contextHash = hashText(input.contextText)
+  const contextSent = state.context_sent ?? {}
+  const pendingBreak = state.pending_break
+
+  const parts = [
+    '# buddy actor turn',
     '',
-    'Task:',
-    input.taskText || '(empty)',
+    '## Actor',
+    input.actor,
     '',
-    'Context:',
-    input.contextText || '(empty)',
+    BUDDY_MESSAGE_PROTOCOL,
     '',
-    'Previous transcript:',
-    input.transcript.map((entry) => `${entry.role}: ${entry.content}`).join('\n') || '(none)',
-    '',
-    'Respond using the Buddy Message Protocol.'
-  ].join('\n')
+    '## Task',
+    taskText
+  ]
+
+  if (contextText && (state.context_hash !== contextHash || !contextSent[input.actor])) {
+    parts.push('', '## Background context', contextText)
+  }
+
+  if (pendingBreak) {
+    const requesterLabel = actorDisplayName(pendingBreak.actor)
+    parts.push(
+      '',
+      '## Break confirmation required',
+      `${requesterLabel} has signaled \`type=break\` and believes the task is complete.`,
+      'You must decide:',
+      '- If you also agree the task is complete, respond with `type=break` to confirm. The task will then end.',
+      '- If you think work should continue, respond with `type=chat` and describe what still needs to be done. The break request will be withdrawn.'
+    )
+  }
+
+  if (input.userMessage) {
+    parts.push('', '## Human message', input.userMessage)
+  }
+
+  parts.push('', '## Runtime settings')
+  parts.push(...runtimeSettingsLines(settings, state, input.actor, input.repoRoot))
+
+  const recent = selectRecentTranscript(input.transcript)
+  if (recent.length > 0) {
+    parts.push('', '## Recent transcript')
+    for (const item of recent) {
+      parts.push(`### ${item.role}`, item.content)
+    }
+  }
+
+  parts.push('', '## Instruction')
+  const humanLang = detectHumanLanguage(input.transcript, input.userMessage ?? '', taskText, contextText)
+  if (pendingBreak) {
+    const requesterName = actorDisplayName(pendingBreak.actor)
+    parts.push(`${requesterName} has requested to end the task. Confirm with \`type=break\` or continue with \`type=chat\`.`)
+  } else {
+    const implementer = implementerActor(settings)
+    if (input.actor === implementer) {
+      parts.push('Continue the implementation work. Report changed files, what you did, and blockers.')
+    } else {
+      parts.push('Review the current task state. Report blocking findings first, then concise next action.')
+    }
+  }
+
+  if (humanLang) {
+    parts.push(`默认使用最近 human message 的语言输出；当前任务使用${humanLang}。除 JSON 等编程语言外，所有自然语言内容都用${humanLang}输出。`)
+  }
+
+  return `${parts.join('\n').trimEnd()}\n`
+}
+
+export function runtimeSettingsLines(
+  settings: Partial<TaskSettings>,
+  state: Partial<TaskState>,
+  actor: string,
+  repoRoot = ''
+): string[] {
+  const maxRounds = numberValue(settings.max_rounds, 10)
+  const roundsInWindow = numberValue(state.rounds_in_window, 0)
+  const remaining = maxRounds > 0 ? Math.max(0, maxRounds - roundsInWindow) : 'unlimited'
+  const lines = [
+    `- Current total round: ${numberValue(state.round, 0)}`,
+    `- Automatic rounds used in this window: ${roundsInWindow}/${maxRounds || 'unlimited'}`,
+    `- Automatic rounds remaining in this window: ${remaining}`,
+    `- Next actor after this turn: ${nextActor(actor, settings)}`
+  ]
+  if (repoRoot) lines.push(`- Repository: ${repoRoot}`)
+  if (state.countdown?.deadline) lines.push(`- Active countdown deadline: ${state.countdown.deadline}`)
+  return lines
+}
+
+export function selectRecentTranscript(transcript: TranscriptEntry[], window = 6): TranscriptEntry[] {
+  const recent = transcript.slice(-window)
+  const recentKeys = new Set(recent.map(rowKey))
+  const earlier = transcript.slice(0, -window)
+
+  for (const role of ['human', ACTOR_CLAUDE, ACTOR_CODEX, ACTOR_OPENCODE, ACTOR_KIMI]) {
+    if (recent.some((item) => item.role === role)) continue
+    const last = [...earlier].reverse().find((item) => item.role === role)
+    if (last && !recentKeys.has(rowKey(last))) {
+      recent.unshift(last)
+      recentKeys.add(rowKey(last))
+    }
+  }
+
+  return recent.sort((a, b) => seqValue(a) - seqValue(b))
+}
+
+export function detectHumanLanguage(
+  transcript: TranscriptEntry[],
+  userMessage = '',
+  taskText = '',
+  contextText = ''
+): string {
+  let text = userMessage.trim()
+  if (!text) {
+    const latestHuman = [...transcript].reverse().find((item) => item.role === 'human')
+    text = latestHuman?.content.trim() ?? ''
+  }
+  if (!text) text = taskText.trim()
+  if (!text) text = contextText.trim()
+  if (!text) return ''
+
+  let cjkCount = 0
+  for (const ch of text) {
+    if (('一' <= ch && ch <= '鿿') || ('㐀' <= ch && ch <= '䶿')) cjkCount += 1
+  }
+  const nonSpace = text.replace(/\s/g, '').length
+  return nonSpace > 0 && cjkCount / nonSpace > 0.1 ? '中文' : 'English'
+}
+
+export function nextActor(actor: string, settings: Partial<TaskSettings>): string {
+  const implementer = settings.implementer_actor ?? ACTOR_CLAUDE
+  const reviewer = settings.reviewer_actor ?? ACTOR_CODEX
+  return actor === implementer ? reviewer : implementer
+}
+
+export function implementerActor(settings: Partial<TaskSettings>): string {
+  return settings.implementer_actor
+    ?? (settings.role_mode === ROLE_MODE_CODEX_IMPL ? ACTOR_CODEX : ACTOR_CLAUDE)
+}
+
+export function actorDisplayName(actor: unknown): string {
+  if (actor === ACTOR_CLAUDE) return 'Claude Code'
+  if (actor === ACTOR_OPENCODE) return 'OpenCode'
+  if (actor === ACTOR_KIMI) return 'Kimi'
+  if (actor === ACTOR_CODEX) return 'Codex'
+  return typeof actor === 'string' && actor ? actor : 'Codex'
+}
+
+export function hashText(text: string): string {
+  return createHash('sha256').update(text, 'utf8').digest('hex')
+}
+
+function rowKey(item: TranscriptEntry): unknown {
+  const seq = seqValue(item)
+  return seq || `${item.role}:${item.ts}:${item.content}`
+}
+
+function seqValue(item: TranscriptEntry): number {
+  const seq = (item as TranscriptEntry & { seq?: unknown }).seq
+  return typeof seq === 'number' && Number.isFinite(seq) ? seq : 0
+}
+
+function numberValue(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback
 }

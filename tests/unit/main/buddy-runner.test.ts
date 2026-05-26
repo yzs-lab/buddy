@@ -62,4 +62,33 @@ describe('BuddyRunner state transitions', () => {
       'actor.started'
     ]))
   })
+
+  it('pauses before starting when the automatic round window is already exhausted', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'buddy-runner-round-window-start-'))
+    const store = new BuddyStore(root)
+    const created = await store.createTask({
+      task_id: 'demo',
+      repo_root: '/tmp/repo',
+      settings: { max_rounds: 1 }
+    })
+    await store.updateTaskState('demo', created.workspace_key, (state) => ({
+      ...state,
+      rounds_in_window: 1
+    }))
+    const runner = new BuddyRunner(store, { executeLaunchers: false })
+
+    await expect(runner.startTask('demo', {
+      workspace_key: created.workspace_key,
+      actor: 'claude'
+    })).rejects.toThrow('自动轮次上限')
+
+    const detail = await store.getTaskDetail('demo', created.workspace_key)
+    expect(detail.state.status).toBe('PAUSED')
+    expect(detail.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'round_window.paused',
+        payload: expect.objectContaining({ max_rounds: 1, rounds_in_window: 1 })
+      })
+    ]))
+  })
 })

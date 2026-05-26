@@ -81,6 +81,131 @@ describe('BuddyRunner with fake launcher', () => {
     ]))
   })
 
+  it('hands off between configured implementer and reviewer actors', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'buddy-runner-handoff-'))
+    const fake = join(root, 'handoff-actor.js')
+    await writeFile(fake, [
+      "const fs = require('fs')",
+      "const actor = process.env.BUDDY_ACTOR",
+      "fs.writeFileSync(process.env.BUDDY_OUTPUT_FILE, JSON.stringify({ type: 'chat', content: `${actor} output` }))"
+    ].join('\n'))
+
+    const store = new BuddyStore(root)
+    const created = await store.createTask({
+      task_id: 'demo',
+      repo_root: root,
+      settings: {
+        implementer_actor: 'opencode',
+        reviewer_actor: 'kimi',
+        launchers: {
+          opencode: { command: `${process.execPath} ${fake}`, env: {}, timeout_seconds: 5 },
+          kimi: { command: `${process.execPath} ${fake}`, env: {}, timeout_seconds: 5 }
+        }
+      }
+    })
+    const runner = new BuddyRunner(store)
+
+    await runner.startTask('demo', {
+      workspace_key: created.workspace_key,
+      actor: 'opencode'
+    })
+
+    const afterImplementer = await store.getTaskDetail('demo', created.workspace_key)
+    expect(afterImplementer.state.next_actor).toBe('kimi')
+    expect(afterImplementer.state.countdown?.default_next_actor).toBe('kimi')
+    expect(afterImplementer.state.round).toBe(1)
+    expect(afterImplementer.state.rounds_in_window).toBe(1)
+    expect(afterImplementer.state.context_sent?.opencode).toBe(true)
+
+    await runner.skipCountdown('demo', {
+      workspace_key: created.workspace_key,
+      next_actor: 'kimi'
+    })
+
+    const afterReviewer = await store.getTaskDetail('demo', created.workspace_key)
+    expect(afterReviewer.state.next_actor).toBe('opencode')
+    expect(afterReviewer.state.round).toBe(2)
+    expect(afterReviewer.state.rounds_in_window).toBe(2)
+  })
+
+  it('uses seed session and thread ids from settings on the first run', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'buddy-runner-seed-session-'))
+    const fake = join(root, 'seed-actor.js')
+    await writeFile(fake, [
+      "const fs = require('fs')",
+      "const args = process.argv.slice(2)",
+      "if (process.env.BUDDY_MODE !== 'resume') throw new Error(`mode ${process.env.BUDDY_MODE}`)",
+      "if (process.env.BUDDY_SESSION_ID !== 'seed-session') throw new Error(`session ${process.env.BUDDY_SESSION_ID}`)",
+      "if (!args.includes('--session-id') || !args.includes('seed-session')) throw new Error(`args ${args.join(' ')}`)",
+      "fs.writeFileSync(process.env.BUDDY_OUTPUT_FILE, JSON.stringify({ type: 'chat', content: 'seeded output' }))",
+      "fs.writeFileSync(process.env.BUDDY_EVENT_FILE, JSON.stringify({ type: 'buddy.session', actor: 'opencode', session_id: 'next-session' }) + '\\n')"
+    ].join('\n'))
+
+    const store = new BuddyStore(root)
+    const created = await store.createTask({
+      task_id: 'demo',
+      repo_root: root,
+      settings: {
+        seed_opencode_session_id: 'seed-session',
+        launchers: {
+          opencode: { command: `${process.execPath} ${fake}`, env: {}, timeout_seconds: 5 }
+        }
+      }
+    })
+    const runner = new BuddyRunner(store)
+
+    await runner.startTask('demo', {
+      workspace_key: created.workspace_key,
+      actor: 'opencode'
+    })
+
+    const detail = await store.getTaskDetail('demo', created.workspace_key)
+    expect(detail.state.opencode_session_id).toBe('next-session')
+  })
+
+  it('pauses after a run that reaches max rounds for the current window', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'buddy-runner-max-rounds-'))
+    const fake = join(root, 'max-rounds-actor.js')
+    await writeFile(fake, [
+      "const fs = require('fs')",
+      "fs.writeFileSync(process.env.BUDDY_OUTPUT_FILE, JSON.stringify({ type: 'chat', content: 'one round' }))"
+    ].join('\n'))
+
+    const store = new BuddyStore(root)
+    const created = await store.createTask({
+      task_id: 'demo',
+      repo_root: root,
+      settings: {
+        max_rounds: 1,
+        launchers: {
+          claude: { command: `${process.execPath} ${fake}`, env: {}, timeout_seconds: 5 }
+        }
+      }
+    })
+    const runner = new BuddyRunner(store)
+
+    await runner.startTask('demo', {
+      workspace_key: created.workspace_key,
+      actor: 'claude'
+    })
+
+    const detail = await store.getTaskDetail('demo', created.workspace_key)
+    expect(detail.state.status).toBe('PAUSED')
+    expect(detail.state.countdown).toBeNull()
+    expect(detail.state.rounds_in_window).toBe(1)
+    expect(detail.state.next_actor).toBe('codex')
+    expect(detail.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'round_window.paused',
+        payload: expect.objectContaining({
+          max_rounds: 1,
+          rounds_in_window: 1,
+          next_actor: 'codex'
+        })
+      })
+    ]))
+  })
+
   it('generates and persists a Kimi session for native Kimi runs', async () => {
     const root = await mkdtemp(join(tmpdir(), 'buddy-runner-kimi-'))
     const fake = join(root, 'kimi')

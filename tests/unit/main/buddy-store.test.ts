@@ -5,6 +5,39 @@ import { describe, expect, it } from 'vitest'
 import { BuddyStore } from '../../../src/main/buddy/store'
 
 describe('BuddyStore read model', () => {
+  it('creates buddy-python compatible initial state from implementer settings', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'buddy-store-create-python-parity-'))
+    const store = new BuddyStore(root)
+
+    const created = await store.createTask({
+      task_id: 'demo',
+      repo_root: '/tmp/repo',
+      task_text: '# Demo',
+      context_text: 'background',
+      settings: {
+        role_mode: 'codex_implements',
+        implementer_actor: 'opencode',
+        reviewer_actor: 'kimi',
+        launchers: {}
+      }
+    })
+
+    const detail = await store.getTaskDetail('demo', created.workspace_key)
+
+    expect(detail.state.round).toBe(0)
+    expect(detail.state.rounds_in_window).toBe(0)
+    expect(detail.state.next_actor).toBe('opencode')
+    expect(detail.state.context_hash).toMatch(/^[a-f0-9]{64}$/)
+    expect(detail.state.context_sent).toEqual({
+      claude: false,
+      codex: false,
+      opencode: false,
+      kimi: false
+    })
+    expect(detail.state.countdown).toBeNull()
+    expect(detail.state.last_error).toBeNull()
+  })
+
   it('loads tasks and task detail from the buddy data directory', async () => {
     const root = await mkdtemp(join(tmpdir(), 'buddy-store-'))
     const taskDir = join(root, 'workspaces', 'abc123def456', 'tasks', 'demo')

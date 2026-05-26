@@ -33,7 +33,10 @@ const countdownSchema = z.object({
 const failureSchema = z.object({
   message: z.string(),
   actor: z.string().optional(),
-  ts: z.string().optional()
+  run_id: z.string().optional(),
+  ts: z.string().optional(),
+  output_file: z.string().optional(),
+  event_file: z.string().optional()
 })
 
 export const taskStateSchema = z.object({
@@ -42,7 +45,7 @@ export const taskStateSchema = z.object({
   repo_root: z.string().optional(),
   status: taskStatusSchema,
   round: z.number(),
-  rounds_in_window: z.number().optional(),
+  rounds_in_window: z.number().default(0),
   next_actor: z.string(),
   countdown: countdownSchema.nullable().optional(),
   active_run: activeRunSchema.nullable().optional(),
@@ -51,7 +54,7 @@ export const taskStateSchema = z.object({
   opencode_session_id: z.string().nullable().optional(),
   kimi_session_id: z.string().nullable().optional(),
   context_hash: z.string().optional(),
-  context_sent: z.record(z.string(), z.boolean()).optional(),
+  context_sent: z.record(z.string(), z.boolean()).default({}),
   event_seq: z.number().optional(),
   transcript_seq: z.number().optional(),
   consecutive_failures: z.number().optional(),

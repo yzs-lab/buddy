@@ -14,6 +14,35 @@ describe('buddy schemas', () => {
     expect(state.round).toBe(1)
   })
 
+  it('parses buddy-python round window and context tracking fields', () => {
+    const state = parseTaskState({
+      status: 'READY',
+      round: 0,
+      rounds_in_window: 0,
+      next_actor: 'opencode',
+      context_hash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+      context_sent: {
+        claude: false,
+        codex: true,
+        opencode: false,
+        kimi: false
+      },
+      active_run: null,
+      last_error: {
+        message: 'boom',
+        actor: 'codex',
+        run_id: 'run-1',
+        ts: '2026-05-26T00:00:00.000Z',
+        output_file: '/tmp/out.md',
+        event_file: '/tmp/events.jsonl'
+      }
+    })
+
+    expect(state.rounds_in_window).toBe(0)
+    expect(state.context_sent?.codex).toBe(true)
+    expect(state.last_error?.run_id).toBe('run-1')
+  })
+
   it('accepts legacy nullable state fields', () => {
     const state = parseTaskState({
       status: 'PAUSED',
