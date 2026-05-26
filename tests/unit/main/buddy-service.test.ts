@@ -15,7 +15,7 @@ describe('BuddyCoreService', () => {
     const service = new BuddyCoreService()
 
     await expect(service.bootstrap()).resolves.toMatchObject({
-      data_root: join(homedir(), 'Library', 'Application Support', 'Buddy')
+      data_root: join(homedir(), 'Library', 'Application Support', 'buddy')
     })
   })
 
@@ -28,10 +28,8 @@ describe('BuddyCoreService', () => {
       tasks: [],
       global_settings: {
         launchers: {
-          claude: { command: 'claude --dangerously-skip-permissions' },
-          codex: { command: 'codex' },
-          opencode: { command: 'opencode' },
-          kimi: { command: 'kimi' }
+          claude: { command: '' },
+          codex: { command: '' }
         }
       }
     })

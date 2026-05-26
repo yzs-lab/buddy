@@ -49,7 +49,7 @@ describe('BuddyRunner state transitions', () => {
     const detail = await store.getTaskDetail('demo', created.workspace_key)
     expect(detail.state.status).toBe('RUNNING_CODEX')
     expect(detail.state.active_run?.actor).toBe('codex')
-    expect(detail.state.countdown).toBeUndefined()
+    expect(detail.state.countdown).toBeNull()
     expect(detail.transcript).toEqual([
       expect.objectContaining({
         role: 'human',
@@ -58,7 +58,7 @@ describe('BuddyRunner state transitions', () => {
       })
     ])
     expect(detail.events.map(event => event.type)).toEqual(expect.arrayContaining([
-      'message.added',
+      'human.message',
       'actor.started'
     ]))
   })

@@ -24,6 +24,6 @@ describe('buddy paths', () => {
   it('builds task directories under workspaces', () => {
     const paths = createBuddyPaths('/tmp/buddy')
 
-    expect(taskDir(paths, 'abc123def456', 'demo')).toBe('/tmp/buddy/workspaces/abc123def456/tasks/demo')
+    expect(taskDir(paths, 'project-abc123def456', 'demo')).toBe('/tmp/buddy/workspaces/project-abc123def456/tasks/demo')
   })
 })

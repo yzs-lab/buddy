@@ -14,21 +14,11 @@ import {
 } from 'lucide-react'
 import { Task, TaskStatus } from '../../shared/types'
 import { ResizeHandle } from './ResizeHandle'
-import { elapsedText } from '../lib/format'
 import { useT } from '../hooks/useI18n'
 import type { TFunction } from '../hooks/useI18n'
 import type { TranslationKey } from '../lib/i18n'
 
 import type { SettingsTab } from './SettingsContent'
-
-function LiveElapsed({ startedAt }: { startedAt: string }) {
-  const [text, setText] = useState(() => elapsedText(startedAt))
-  useEffect(() => {
-    const id = setInterval(() => setText(elapsedText(startedAt)), 1000)
-    return () => clearInterval(id)
-  }, [startedAt])
-  return <span className="text-accent">{text}</span>
-}
 
 const STATUS_KEYS: Record<TaskStatus, TranslationKey> = {
   READY: 'status.READY',
@@ -341,9 +331,6 @@ function ChatSidebar({
                 {pinnedTasks.map((task) => {
                   const isSelected = selectedTaskId === task.task_id
                   const isRunning = statusClass(task.status) === 'running'
-                  const elapsed = isRunning && task.active_run?.started_at
-                    ? elapsedText(task.active_run.started_at)
-                    : null
                   const proj = projectName(task, projectNames)
                   return (
                     <div
@@ -395,11 +382,6 @@ function ChatSidebar({
                           </button>
                         </div>
                       </div>
-                      {elapsed && (
-                        <div className="flex items-center gap-1.5 mt-0.5 pl-[22px] text-xs text-fg-muted">
-                          <LiveElapsed startedAt={task.active_run!.started_at} />
-                        </div>
-                      )}
                     </div>
                   )
                 })}
@@ -478,9 +460,6 @@ function ChatSidebar({
                     workspaceTasks.map((task) => {
                       const isSelected = selectedTaskId === task.task_id
                       const isRunning = statusClass(task.status) === 'running'
-                      const elapsed = isRunning && task.active_run?.started_at
-                        ? elapsedText(task.active_run.started_at)
-                        : null
                       return (
                         <div
                           key={task.task_id}
@@ -530,11 +509,6 @@ function ChatSidebar({
                               </button>
                             </div>
                           </div>
-                          {elapsed && (
-                            <div className="flex items-center gap-1.5 mt-0.5 pl-[22px] text-xs text-fg-muted">
-                              <LiveElapsed startedAt={task.active_run!.started_at} />
-                            </div>
-                          )}
                         </div>
                       )
                     })

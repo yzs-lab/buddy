@@ -32,26 +32,22 @@ interface StatusBarProps {
   onResize: (delta: number) => void
 }
 
-const STATUS_KEYS: Record<TaskStatus, TranslationKey> = {
-  READY: 'status.READY',
-  RUNNING_CLAUDE: 'status.RUNNING_CLAUDE',
-  RUNNING_CODEX: 'status.RUNNING_CODEX',
-  RUNNING_OPENCODE: 'status.RUNNING_OPENCODE',
-  RUNNING_KIMI: 'status.RUNNING_KIMI',
-  COUNTDOWN: 'status.COUNTDOWN',
-  PAUSED: 'status.PAUSED',
-  FAILED: 'status.FAILED',
-  DONE: 'status.DONE'
+interface CompactStatusInfo {
+  cls: 'running' | 'paused' | 'done' | 'danger' | 'ready'
+  labelKey: TranslationKey
+  pulse: boolean
 }
 
-function statusClass(status: TaskStatus | undefined): string {
-  if (!status) return 'neutral'
-  if (status === 'COUNTDOWN' || status === 'READY') return 'ready'
-  if (status.startsWith('RUNNING_')) return 'running'
-  if (status === 'FAILED') return 'danger'
-  if (status === 'PAUSED') return 'paused'
-  if (status === 'DONE') return 'done'
-  return 'neutral'
+function compactStatusInfo(status: TaskStatus | null | undefined): CompactStatusInfo | null {
+  if (!status) return null
+  if (status.startsWith('RUNNING_') || status === 'COUNTDOWN') {
+    return { cls: 'running', labelKey: 'titleBar.status.running', pulse: true }
+  }
+  if (status === 'PAUSED') return { cls: 'paused', labelKey: 'status.PAUSED', pulse: false }
+  if (status === 'DONE') return { cls: 'done', labelKey: 'status.DONE', pulse: false }
+  if (status === 'FAILED') return { cls: 'danger', labelKey: 'status.FAILED', pulse: false }
+  if (status === 'READY') return { cls: 'ready', labelKey: 'status.READY', pulse: false }
+  return null
 }
 
 const SESSION_FIELD: Record<Actor, keyof TaskState> = {
@@ -115,15 +111,19 @@ export function StatusBar({
       >
         {/* 运行状态 */}
         <section className="p-4 border-b border-border">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-semibold">{t('statusBar.runStatus')}</h3>
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <h3 className="text-sm font-semibold min-w-0">{t('statusBar.runStatus')}</h3>
+            <InlineStatus
+              status={taskState?.status}
+              onRetry={onRetry}
+              onResume={onResume}
+              t={t}
+            />
           </div>
 
-          <TaskStatusBanner
+          <FailureDetail
             status={taskState?.status}
             failure={latestFailure}
-            onRetry={onRetry}
-            onResume={onResume}
             t={t}
             lang={lang}
           />
@@ -209,72 +209,70 @@ function actorLabel(actor: string | undefined, t: TFunction): string {
   return ACTOR_LABEL_KEY[actor] ? t(ACTOR_LABEL_KEY[actor]) : actor
 }
 
-function TaskStatusBanner({
+function InlineStatus({
   status,
-  failure,
   onRetry,
   onResume,
+  t
+}: {
+  status: TaskStatus | undefined
+  onRetry: () => void
+  onResume: () => void
+  t: TFunction
+}) {
+  const info = compactStatusInfo(status)
+  if (!info) return null
+  return (
+    <div className="h-5 flex flex-shrink-0 items-center gap-1.5">
+      <span className={`status-dot status-dot-${info.cls} ${info.pulse ? 'status-dot-pulse' : ''}`} />
+      <span className={`text-xs font-medium status-text-${info.cls}`}>{t(info.labelKey)}</span>
+      {status === 'PAUSED' && (
+        <button
+          onClick={onResume}
+          title={t('statusBar.tooltipResume')}
+          className="ml-0.5 w-5 h-5 flex items-center justify-center rounded text-fg-secondary hover:text-fg hover:bg-bg-muted"
+        >
+          <Play size={12} strokeWidth={2.5} fill="currentColor" />
+        </button>
+      )}
+      {status === 'FAILED' && (
+        <button
+          onClick={onRetry}
+          title={t('statusBar.tooltipRetry')}
+          className="ml-0.5 w-5 h-5 flex items-center justify-center rounded text-fg-secondary hover:text-fg hover:bg-bg-muted"
+        >
+          <RotateCw size={12} strokeWidth={2.5} />
+        </button>
+      )}
+    </div>
+  )
+}
+
+function FailureDetail({
+  status,
+  failure,
   t,
   lang
 }: {
   status: TaskStatus | undefined
   failure: Failure | null
-  onRetry: () => void
-  onResume: () => void
   t: TFunction
   lang: Language
 }) {
-  const cls = statusClass(status)
-  const text = status ? t(STATUS_KEYS[status]) : t('statusBar.statusLoading')
-  const isRunning = status?.startsWith('RUNNING_') ?? false
-  const isFailed = status === 'FAILED'
-  const isPaused = status === 'PAUSED'
-  const failureSnippet = isFailed && failure?.message
-    ? truncate(decodeErrorText(failure.message), 240)
-    : ''
-  const failureActor = failure?.actor ? actorLabel(failure.actor, t) : ''
-  const failureWhen = failure?.ts ? formatTime(failure.ts, lang) : ''
-
+  if (status !== 'FAILED' || !failure?.message) return null
+  const failureSnippet = truncate(decodeErrorText(failure.message), 240)
+  const failureActor = failure.actor ? actorLabel(failure.actor, t) : ''
+  const failureWhen = failure.ts ? formatTime(failure.ts, lang) : ''
   return (
-    <div className={`mb-3 rounded-lg border ${isFailed ? 'border-danger bg-bg-subtle' : 'border-border-subtle bg-bg-subtle'}`}>
-      <div className="flex items-center justify-between gap-2 px-3 py-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className={`status-dot status-dot-${cls} ${isRunning ? 'status-dot-pulse' : ''}`} />
-          <span className={`text-sm font-medium status-text-${cls}`}>{text}</span>
-        </div>
-        {isFailed && (
-          <button
-            onClick={onRetry}
-            title={t('statusBar.tooltipRetry')}
-            className="px-2.5 py-1 text-xs bg-accent text-fg-inverse rounded flex items-center gap-1.5 hover:bg-accent-hover flex-shrink-0"
-          >
-            <RotateCw size={12} strokeWidth={2.5} />
-            {t('common.retry')}
-          </button>
-        )}
-        {isPaused && (
-          <button
-            onClick={onResume}
-            title={t('statusBar.tooltipResume')}
-            className="px-2.5 py-1 text-xs bg-accent text-fg-inverse rounded flex items-center gap-1.5 hover:bg-accent-hover flex-shrink-0"
-          >
-            <Play size={12} strokeWidth={2.5} fill="currentColor" />
-            {t('common.resume')}
-          </button>
-        )}
-      </div>
-      {isFailed && failureSnippet && (
-        <div className="px-3 pb-2 text-xs text-fg-secondary">
-          {(failureActor || failureWhen) && (
-            <div className="text-fg-muted mb-1">
-              {failureActor}{failureActor && failureWhen ? ' · ' : ''}{failureWhen}
-            </div>
-          )}
-          <pre className="whitespace-pre-wrap break-words font-sans leading-relaxed">
-            {failureSnippet}
-          </pre>
+    <div className="mb-3 rounded-lg border border-danger bg-bg-subtle px-3 py-2 text-xs text-fg-secondary">
+      {(failureActor || failureWhen) && (
+        <div className="text-fg-muted mb-1">
+          {failureActor}{failureActor && failureWhen ? ' · ' : ''}{failureWhen}
         </div>
       )}
+      <pre className="whitespace-pre-wrap break-words font-sans leading-relaxed">
+        {failureSnippet}
+      </pre>
     </div>
   )
 }

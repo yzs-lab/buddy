@@ -6,6 +6,7 @@ import type {
   SendMessageInput,
   StartTaskInput,
   TranscriptEntry,
+  TaskSettings,
   TaskState
 } from '../../shared/types'
 import { buildLauncherCommand, commandKindFor, runLauncher, type LauncherCommandKind } from './launchers'
@@ -47,6 +48,7 @@ export class BuddyRunner {
     if (!status) throw new Error(`Unsupported actor: ${actor}`)
     const runId = `run_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`
     const startedAt = new Date().toISOString()
+    const sessionBefore = sessionIdForActor(actor, detail.state) ?? seedSessionIdForActor(actor, detail.settings) ?? null
 
     await this.store.updateTaskState(taskId, workspaceKey, (state) => {
       if (
@@ -61,8 +63,15 @@ export class BuddyRunner {
       return {
         ...state,
         status,
-        active_run: { actor, started_at: startedAt },
-        countdown: undefined,
+        active_run: {
+          run_id: runId,
+          actor,
+          started_at: startedAt,
+          status: 'running',
+          session_id_before: sessionBefore,
+          session_id_after: null
+        },
+        countdown: null,
         latest_failure: null,
         updated_at: startedAt
       }
@@ -71,7 +80,7 @@ export class BuddyRunner {
       type: 'actor.started',
       actor,
       run_id: runId,
-      payload: { run_id: runId }
+      payload: { mode: sessionBefore ? 'resume' : 'start' }
     })
 
     if (!this.executeLaunchers) {
@@ -94,9 +103,9 @@ export class BuddyRunner {
       { source: 'run_once' }
     )
     await this.store.appendTaskEvent(taskId, input.workspace_key, {
-      type: 'message.added',
+      type: 'human.message',
       actor: input.actor,
-      payload: { message }
+      payload: { content: message }
     })
     await this.startTask(taskId, {
       workspace_key: input.workspace_key,
@@ -178,7 +187,7 @@ export class BuddyRunner {
     const eventFile = join(artifactsDir, `${runId}-events.jsonl`)
     await writeFile(promptFile, prompt)
     const cwd = await existingCwd(detail.state.repo_root)
-    const existingSessionId = sessionIdForActor(actor, detail.state)
+    const existingSessionId = sessionIdForActor(actor, detail.state) ?? seedSessionIdForActor(actor, detail.settings)
     const commandKind = commandKindFor(actor, launcher.command)
     const sessionId = actor === 'kimi' && commandKind === 'native_kimi' && !existingSessionId
       ? randomBytes(8).toString('hex')
@@ -260,7 +269,7 @@ export class BuddyRunner {
     const message = parseBuddyMessage(text)
     const detail = await this.store.getTaskDetail(taskId, workspaceKey)
     const nextActor = actor === 'claude' ? 'codex' : 'claude'
-    const round = detail.state.round
+    const round = (detail.state.round ?? 0) + 1
     const now = new Date().toISOString()
     const buddyType = message.kind === 'break' ? 'break' : 'chat'
     const transcriptContent = message.kind === 'break' ? message.content : message.text
@@ -283,11 +292,14 @@ export class BuddyRunner {
     })
 
     await this.store.updateTaskState(taskId, workspaceKey, (state) => {
-      const nextRound = (state.round ?? round) + 1
+      const nextRound = (state.round ?? 0) + 1
       const next: TaskState = {
         ...state,
         active_run: null,
         round: nextRound,
+        rounds_in_window: (state.rounds_in_window ?? 0) + 1,
+        consecutive_failures: 0,
+        last_error: null,
         updated_at: now
       }
       if (actor === 'claude' && sessionId) next.claude_session_id = sessionId
@@ -299,7 +311,7 @@ export class BuddyRunner {
         return {
           ...next,
           status: 'DONE',
-          countdown: undefined,
+          countdown: null,
           pending_break: null
         }
       }
@@ -309,10 +321,11 @@ export class BuddyRunner {
           ...next,
           status: 'COUNTDOWN',
           next_actor: nextActor,
-          pending_break: { actor, round },
+          pending_break: { actor, round: nextRound },
           countdown: {
             status: 'running',
-            remaining: detail.settings.countdown_seconds,
+            started_at: now,
+            after_actor: actor,
             default_next_actor: nextActor,
             deadline: new Date(Date.now() + detail.settings.countdown_seconds * 1000).toISOString()
           }
@@ -326,7 +339,8 @@ export class BuddyRunner {
         pending_break: breakRejected ? null : next.pending_break,
         countdown: {
           status: 'running',
-          remaining: detail.settings.countdown_seconds,
+          started_at: now,
+          after_actor: actor,
           default_next_actor: nextActor,
           deadline: new Date(Date.now() + detail.settings.countdown_seconds * 1000).toISOString()
         }
@@ -433,10 +447,18 @@ export class BuddyRunner {
 }
 
 function sessionIdForActor(actor: string, state: TaskState): string | undefined {
-  if (actor === 'claude') return state.claude_session_id
-  if (actor === 'codex') return state.codex_thread_id
-  if (actor === 'opencode') return state.opencode_session_id
-  if (actor === 'kimi') return state.kimi_session_id
+  if (actor === 'claude') return state.claude_session_id ?? undefined
+  if (actor === 'codex') return state.codex_thread_id ?? undefined
+  if (actor === 'opencode') return state.opencode_session_id ?? undefined
+  if (actor === 'kimi') return state.kimi_session_id ?? undefined
+  return undefined
+}
+
+function seedSessionIdForActor(actor: string, settings: TaskSettings): string | undefined {
+  if (actor === 'claude') return settings.seed_claude_session_id || undefined
+  if (actor === 'codex') return settings.seed_codex_thread_id || undefined
+  if (actor === 'opencode') return settings.seed_opencode_session_id || undefined
+  if (actor === 'kimi') return settings.seed_kimi_session_id || undefined
   return undefined
 }
 

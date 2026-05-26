@@ -34,10 +34,13 @@ describe('BuddyRunner with fake launcher', () => {
     expect(detail.events.some((event) => event.type === 'actor.completed')).toBe(true)
 
     const transcriptJsonl = await readFile(join(root, 'workspaces', created.workspace_key, 'tasks', 'demo', 'transcript.jsonl'), 'utf8')
-    expect(transcriptJsonl).toContain('"role":"codex"')
-    expect(transcriptJsonl).toContain('"content":"done"')
-    expect(transcriptJsonl).toContain('"buddy_type":"chat"')
-    expect(transcriptJsonl).toContain('"elapsed_ms"')
+    const transcriptRow = JSON.parse(transcriptJsonl)
+    expect(transcriptRow).toMatchObject({
+      role: 'codex',
+      content: 'done',
+      meta: expect.objectContaining({ buddy_type: 'chat' })
+    })
+    expect(transcriptRow.meta.elapsed_ms).toEqual(expect.any(Number))
   })
 
   it('runs custom launchers with buddy contract flags and environment', async () => {

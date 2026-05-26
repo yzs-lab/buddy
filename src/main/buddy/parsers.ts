@@ -120,29 +120,62 @@ export function parseBuddyMessage(text: string): BuddyMessage {
 }
 
 function parseBuddyJsonMessage(text: string): BuddyMessage | null {
-  const candidates: string[] = []
-  const fenced = text.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i)
-  if (fenced) candidates.push(fenced[1].trim())
-  candidates.push(text)
+  const fenced = text.match(/```json\s*(\{[\s\S]*\})\s*```/i)
+  if (fenced) {
+    const parsed = parseBuddyJsonCandidate(fenced[1])
+    if (parsed) return parsed
+    const loose = looseExtractBuddyMessage(fenced[1])
+    if (loose) return loose
+  }
+
+  const parsed = parseBuddyJsonCandidate(text)
+  if (parsed) return parsed
+
+  if (text.startsWith('{')) {
+    const loose = looseExtractBuddyMessage(text)
+    if (loose) return loose
+  }
 
   const embedded = text.match(/\{[^{}]*"type"\s*:\s*"(?:chat|break)"[^{}]*\}/s)
-  if (embedded) candidates.push(embedded[0])
-
-  for (const candidate of candidates) {
-    try {
-      const parsed = JSON.parse(candidate)
-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) continue
-      const type = (parsed as { type?: unknown }).type
-      const content = (parsed as { content?: unknown }).content
-      if ((type === 'chat' || type === 'break') && typeof content === 'string') {
-        return type === 'break'
-          ? { kind: 'break', content }
-          : { kind: 'message', text: content }
-      }
-    } catch {}
+  if (embedded) {
+    return parseBuddyJsonCandidate(embedded[0])
   }
 
   return null
+}
+
+function parseBuddyJsonCandidate(text: string): BuddyMessage | null {
+  try {
+    const parsed = JSON.parse(text)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
+    const type = (parsed as { type?: unknown }).type
+    const content = (parsed as { content?: unknown }).content
+    if ((type === 'chat' || type === 'break') && typeof content === 'string') {
+      return type === 'break'
+        ? { kind: 'break', content }
+        : { kind: 'message', text: content }
+    }
+  } catch {}
+  return null
+}
+
+function looseExtractBuddyMessage(text: string): BuddyMessage | null {
+  const typeMatch = text.match(/"type"\s*:\s*"(chat|break)"/)
+  if (!typeMatch) return null
+
+  const contentMatch = text.match(/"content"\s*:\s*"([\s\S]+)/)
+  if (!contentMatch) return null
+
+  let content = contentMatch[1]
+  const trimmedContent = content.trimEnd()
+  const structuralEnd = /"\s*\}\s*$/.exec(trimmedContent)
+  if (structuralEnd) {
+    content = trimmedContent.slice(0, structuralEnd.index)
+  }
+
+  return typeMatch[1] === 'break'
+    ? { kind: 'break', content }
+    : { kind: 'message', text: content }
 }
 
 function extractClaudeOutput(rawEvents: string): string {

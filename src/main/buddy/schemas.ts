@@ -13,20 +13,22 @@ const taskStatusSchema = z.enum([
 ])
 
 const activeRunSchema = z.object({
+  run_id: z.string().optional(),
   actor: z.string(),
-  started_at: z.string()
+  started_at: z.string(),
+  status: z.literal('running').optional(),
+  session_id_before: z.string().nullable().optional(),
+  session_id_after: z.string().nullable().optional()
 })
 
 const countdownSchema = z.object({
   status: z.enum(['running', 'paused', 'elapsed', 'skipped', 'expired']),
-  remaining: z.number().default(0),
+  remaining: z.number().optional().default(0),
+  started_at: z.string().optional(),
+  after_actor: z.string().optional(),
   default_next_actor: z.string(),
   deadline: z.string().optional()
 })
-
-function optionalLegacyNullable<T extends z.ZodType>(schema: T) {
-  return z.preprocess((value) => value === null ? undefined : value, schema.optional())
-}
 
 const failureSchema = z.object({
   message: z.string(),
@@ -35,17 +37,27 @@ const failureSchema = z.object({
 })
 
 export const taskStateSchema = z.object({
+  protocol_version: z.string().optional(),
+  task_id: z.string().optional(),
+  repo_root: z.string().optional(),
   status: taskStatusSchema,
   round: z.number(),
+  rounds_in_window: z.number().optional(),
   next_actor: z.string(),
-  countdown: optionalLegacyNullable(countdownSchema),
+  countdown: countdownSchema.nullable().optional(),
   active_run: activeRunSchema.nullable().optional(),
-  claude_session_id: optionalLegacyNullable(z.string()),
-  codex_thread_id: optionalLegacyNullable(z.string()),
-  opencode_session_id: optionalLegacyNullable(z.string()),
-  kimi_session_id: optionalLegacyNullable(z.string()),
+  claude_session_id: z.string().nullable().optional(),
+  codex_thread_id: z.string().nullable().optional(),
+  opencode_session_id: z.string().nullable().optional(),
+  kimi_session_id: z.string().nullable().optional(),
+  context_hash: z.string().optional(),
+  context_sent: z.record(z.string(), z.boolean()).optional(),
+  event_seq: z.number().optional(),
+  transcript_seq: z.number().optional(),
+  consecutive_failures: z.number().optional(),
+  last_error: failureSchema.nullable().optional(),
+  created_at: z.string().optional(),
   updated_at: z.string().optional(),
-  repo_root: z.string().optional(),
   pending_break: z.object({ actor: z.string().optional(), round: z.number().optional() }).nullable().optional(),
   latest_failure: failureSchema.nullable().optional()
 })
@@ -65,7 +77,11 @@ export const taskSettingsSchema = z.object({
   implementer_actor: z.string().optional(),
   reviewer_actor: z.string().optional(),
   max_rounds: z.number().optional(),
-  max_consecutive_failures: z.number().optional()
+  max_consecutive_failures: z.number().optional(),
+  seed_claude_session_id: z.string().optional(),
+  seed_codex_thread_id: z.string().optional(),
+  seed_opencode_session_id: z.string().optional(),
+  seed_kimi_session_id: z.string().optional()
 })
 
 export const globalSettingsSchema = z.object({
@@ -73,11 +89,14 @@ export const globalSettingsSchema = z.object({
   countdown_seconds: z.number().default(30),
   max_rounds: z.number().default(10),
   max_consecutive_failures: z.number().default(3),
-  launchers: z.record(z.string(), launcherSchema).default({})
+  launchers: z.record(z.string(), launcherSchema).default({}),
+  seed_claude_session_id: z.string().optional(),
+  seed_codex_thread_id: z.string().optional()
 })
 
 export const eventSchema = z.object({
   seq: z.number(),
+  task_id: z.string().optional(),
   type: z.string(),
   actor: z.string().optional(),
   ts: z.string(),

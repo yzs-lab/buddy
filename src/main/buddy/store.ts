@@ -6,6 +6,7 @@ import {
   rm,
   writeFile
 } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
 import { dirname, join } from 'node:path'
 import type {
   CreateTaskInput,
@@ -20,7 +21,7 @@ import type {
   TranscriptEntry
 } from '../../shared/types'
 import { normalizeGlobalSettings, normalizeLaunchers } from '../../shared/defaults'
-import { createBuddyPaths, taskDir, workspaceKeyForRepo } from './paths'
+import { canonicalRepoRoot, createBuddyPaths, taskDir, workspaceKeyForRepo } from './paths'
 import { redactJsonValue } from './redact'
 import { parseEventLine, parseGlobalSettings, parseTaskSettings, parseTaskState } from './schemas'
 
@@ -86,28 +87,34 @@ export class BuddyStore {
   }
 
   async createTask(input: CreateTaskInput): Promise<CreateTaskResult> {
-    const repoRoot = input.repo_root ?? ''
+    const repoRoot = canonicalRepoRoot(input.repo_root ?? '')
     const workspaceKey = workspaceKeyForRepo(repoRoot || input.task_id)
     const dir = this.taskDirectory(input.task_id, workspaceKey)
-    const now = new Date().toISOString()
+    const now = utcNow()
+    const taskText = taskMarkdownContent(input.task_text ?? '')
+    const contextText = contextMarkdownContent(input.context_text ?? '')
 
     const globalSettings = await this.readGlobalSettings()
+    const settings = defaultTaskSettings(globalSettings, input.settings)
+    const state = defaultTaskState(input.task_id, repoRoot, settings, contextText, now)
+    state.event_seq = 1
 
+    await mkdir(join(dir, 'rounds'), { recursive: true })
     await mkdir(join(dir, 'artifacts'), { recursive: true })
-    await atomicWriteJson(join(dir, 'settings.json'), defaultTaskSettings(globalSettings, input.settings))
-    await atomicWriteJson(join(dir, 'state.json'), defaultTaskState(repoRoot, now))
-    await atomicWriteJson(join(dir, 'task.json'), {
-      task_text: input.task_text ?? '',
-      context_text: input.context_text ?? ''
-    })
-    await atomicWriteText(join(dir, 'transcript.md'), initialTranscript(input, now))
+    await this.writeWorkspaceMetadata(workspaceKey, repoRoot, now)
+    await atomicWriteText(join(dir, 'task.md'), taskText)
+    await atomicWriteText(join(dir, 'context.md'), contextText)
+    await atomicWriteJson(join(dir, 'settings.json'), settings)
+    await atomicWriteJson(join(dir, 'state.json'), state)
+    await atomicWriteText(join(dir, 'status'), `${state.status}\n`)
+    await atomicAppendText(join(dir, '.buddy.lock'), '')
     await appendEventLine(join(dir, 'events.jsonl'), {
       seq: 1,
+      task_id: input.task_id,
       type: 'task.created',
       ts: now,
       payload: {
-        task_text: input.task_text ?? '',
-        context_text: input.context_text ?? ''
+        task_id: input.task_id
       }
     })
 
@@ -158,8 +165,7 @@ export class BuddyStore {
     update: (state: TaskState) => TaskState
   ): Promise<TaskState> {
     const next = update(await this.readTaskState(taskId, workspaceKey))
-    await atomicWriteJson(this.statePath(taskId, workspaceKey), next)
-    return next
+    return this.writeTaskState(taskId, workspaceKey, next)
   }
 
   async appendTaskEvent(
@@ -168,9 +174,14 @@ export class BuddyStore {
     event: Omit<Event, 'seq' | 'ts'> & Partial<Pick<Event, 'seq' | 'ts'>>
   ): Promise<Event> {
     const events = await this.readEvents(taskId, workspaceKey)
+    const state = await this.readTaskState(taskId, workspaceKey)
     const next: Event = {
-      seq: event.seq ?? events.reduce((max, item) => Math.max(max, item.seq), 0) + 1,
-      ts: event.ts ?? new Date().toISOString(),
+      seq: event.seq ?? Math.max(
+        state.event_seq ?? 0,
+        events.reduce((max, item) => Math.max(max, item.seq), 0)
+      ) + 1,
+      task_id: taskId,
+      ts: event.ts ?? utcNow(),
       type: event.type,
       actor: event.actor,
       run_id: event.run_id,
@@ -178,6 +189,10 @@ export class BuddyStore {
     }
     const redacted = redactJsonValue(next)
     await appendEventLine(this.eventsPath(taskId, workspaceKey), redacted)
+    await this.writeTaskState(taskId, workspaceKey, {
+      ...state,
+      event_seq: next.seq
+    })
     return redacted
   }
 
@@ -188,19 +203,23 @@ export class BuddyStore {
     content: string,
     meta: Record<string, unknown> = {}
   ): Promise<TranscriptEntry> {
-    const entries = await this.readTranscriptJsonl(taskId, workspaceKey)
-    const seq = entries.reduce((max, entry) => Math.max(max, numberValue((entry as { seq?: unknown }).seq) ?? 0), 0) + 1
+    const state = await this.readTaskState(taskId, workspaceKey)
+    const seq = (state.transcript_seq ?? 0) + 1
     const row = {
       seq,
-      ts: new Date().toISOString(),
+      ts: utcNow(),
       role,
       content,
       meta
     }
     await atomicAppendText(
       this.transcriptJsonlPath(taskId, workspaceKey),
-      `${JSON.stringify(row)}\n`
+      `${stringifyPythonJsonLine(row)}\n`
     )
+    await this.writeTaskState(taskId, workspaceKey, {
+      ...state,
+      transcript_seq: seq
+    })
     return row
   }
 
@@ -224,21 +243,34 @@ export class BuddyStore {
     return join(this.taskDirectory(taskId, workspaceKey), 'transcript.jsonl')
   }
 
+  private async writeWorkspaceMetadata(workspaceKey: string, repoRoot: string, now: string): Promise<void> {
+    await atomicWriteJson(join(createBuddyPaths(this.dataRoot).workspacesDir, workspaceKey, 'workspace.json'), {
+      protocol_version: '1',
+      workspace_key: workspaceKey,
+      default_repo_root: repoRoot,
+      updated_at: now
+    })
+  }
+
   private async readTaskMeta(taskId: string, workspaceKey: string): Promise<TaskMeta> {
+    const markdown = await this.readMarkdownTaskMeta(taskId, workspaceKey)
+    if (markdown) return markdown
+
     const path = join(this.taskDirectory(taskId, workspaceKey), 'task.json')
     try {
       return await readJson(path) as TaskMeta
     } catch {
-      return this.readLegacyTaskMeta(taskId, workspaceKey)
+      return { task_text: '', context_text: '' }
     }
   }
 
-  private async readLegacyTaskMeta(taskId: string, workspaceKey: string): Promise<TaskMeta> {
+  private async readMarkdownTaskMeta(taskId: string, workspaceKey: string): Promise<TaskMeta | null> {
     const dir = this.taskDirectory(taskId, workspaceKey)
     const [taskText, contextText] = await Promise.all([
       readOptionalText(join(dir, 'task.md')),
       readOptionalText(join(dir, 'context.md'))
     ])
+    if (!taskText && !contextText) return null
     return {
       task_text: taskText,
       context_text: contextText
@@ -277,6 +309,20 @@ export class BuddyStore {
         return []
       }
     })
+  }
+
+  private async writeTaskState(taskId: string, workspaceKey: string, state: TaskState): Promise<TaskState> {
+    const current = await readOptionalJson(this.statePath(taskId, workspaceKey)) as Partial<TaskState>
+    const next = {
+      ...state,
+      protocol_version: '1',
+      event_seq: Math.max(numberValue(state.event_seq) ?? 0, numberValue(current?.event_seq) ?? 0),
+      transcript_seq: Math.max(numberValue(state.transcript_seq) ?? 0, numberValue(current?.transcript_seq) ?? 0),
+      updated_at: utcNow()
+    } as TaskState
+    await atomicWriteJson(this.statePath(taskId, workspaceKey), next)
+    await atomicWriteText(join(this.taskDirectory(taskId, workspaceKey), 'status'), `${next.status}\n`)
+    return next
   }
 }
 
@@ -341,6 +387,14 @@ async function readJson(path: string): Promise<unknown> {
   return JSON.parse(await readFile(path, 'utf8'))
 }
 
+async function readOptionalJson(path: string): Promise<unknown> {
+  try {
+    return await readJson(path)
+  } catch {
+    return {}
+  }
+}
+
 async function readOptionalText(path: string): Promise<string> {
   try {
     return await readFile(path, 'utf8')
@@ -350,7 +404,7 @@ async function readOptionalText(path: string): Promise<string> {
 }
 
 async function atomicWriteJson(path: string, value: unknown): Promise<void> {
-  await atomicWriteText(path, JSON.stringify(value))
+  await atomicWriteText(path, stringifyJson(value))
 }
 
 async function atomicWriteText(path: string, value: string): Promise<void> {
@@ -362,7 +416,7 @@ async function atomicWriteText(path: string, value: string): Promise<void> {
 
 async function appendEventLine(path: string, event: Event): Promise<void> {
   await mkdir(dirname(path), { recursive: true })
-  await writeFile(path, `${JSON.stringify(event)}\n`, { flag: 'a' })
+  await writeFile(path, `${stringifyJsonLine(event)}\n`, { flag: 'a' })
 }
 
 async function atomicAppendText(path: string, value: string): Promise<void> {
@@ -386,9 +440,11 @@ function defaultTaskSettings(
     countdown_seconds: normalizedGlobal.countdown_seconds ?? 30,
     flow_policy: 'claude_then_codex',
     role_mode: 'claude_implements',
-    launchers,
     max_rounds: normalizedGlobal.max_rounds,
     max_consecutive_failures: normalizedGlobal.max_consecutive_failures,
+    launchers,
+    seed_claude_session_id: normalizedGlobal.seed_claude_session_id ?? '',
+    seed_codex_thread_id: normalizedGlobal.seed_codex_thread_id ?? '',
     ...restOverrides
   } as TaskSettings
 }
@@ -415,29 +471,89 @@ function isNotFoundError(error: unknown): boolean {
   return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT'
 }
 
-function defaultTaskState(repoRoot: string, now: string): TaskState {
+function defaultTaskState(
+  taskId: string,
+  repoRoot: string,
+  settings: TaskSettings,
+  contextText: string,
+  now: string
+): TaskState {
+  const initialActor = settings.role_mode === 'codex_implements' ? 'codex' : 'claude'
   return {
-    status: 'READY',
-    round: 1,
-    next_actor: 'claude',
-    active_run: null,
-    updated_at: now,
+    protocol_version: '1',
+    task_id: taskId,
     repo_root: repoRoot,
+    status: 'READY',
+    round: 0,
+    rounds_in_window: 0,
+    next_actor: initialActor,
+    claude_session_id: null,
+    codex_thread_id: null,
+    context_hash: sha256Hex(contextText),
+    context_sent: { claude: false, codex: false },
+    active_run: null,
+    countdown: null,
+    last_error: null,
+    event_seq: 0,
+    transcript_seq: 0,
+    consecutive_failures: 0,
+    created_at: now,
+    updated_at: now,
     pending_break: null
   }
 }
 
-function initialTranscript(input: CreateTaskInput, now: string): string {
-  const lines = [
-    `# ${input.task_id}`,
-    '',
-    `Created: ${now}`,
-    '',
-    '## Task',
-    input.task_text ?? '',
-    '',
-    '## Context',
-    input.context_text ?? ''
-  ]
-  return `${lines.join('\n')}\n`
+function taskMarkdownContent(value: string): string {
+  return `${value.trimEnd()}\n`
+}
+
+function contextMarkdownContent(value: string): string {
+  const trimmed = value.trimEnd()
+  return trimmed ? `${trimmed}\n` : ''
+}
+
+function sha256Hex(value: string): string {
+  return createHash('sha256').update(value).digest('hex')
+}
+
+function utcNow(): string {
+  return new Date().toISOString().replace(/\.\d{3}Z$/, 'Z')
+}
+
+function stringifyJson(value: unknown): string {
+  return `${JSON.stringify(sortJsonValue(value), null, 2)}\n`
+}
+
+function stringifyJsonLine(value: unknown): string {
+  return JSON.stringify(sortJsonValue(value))
+}
+
+function stringifyPythonJsonLine(value: unknown): string {
+  return stringifyPythonJsonValue(sortJsonValue(value))
+}
+
+function stringifyPythonJsonValue(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(stringifyPythonJsonValue).join(', ')}]`
+  }
+  if (!value || typeof value !== 'object') {
+    return JSON.stringify(value)
+  }
+
+  const entries = Object.entries(value as Record<string, unknown>)
+    .filter(([, item]) => item !== undefined)
+  return `{${entries
+    .map(([key, item]) => `${JSON.stringify(key)}: ${stringifyPythonJsonValue(item)}`)
+    .join(', ')}}`
+}
+
+function sortJsonValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sortJsonValue)
+  if (!value || typeof value !== 'object') return value
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .filter(([, item]) => item !== undefined)
+      .sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)
+      .map(([key, item]) => [key, sortJsonValue(item)])
+  )
 }
