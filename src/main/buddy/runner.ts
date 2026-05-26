@@ -38,20 +38,24 @@ export class BuddyRunner {
     if (!input.workspace_key) throw new Error('workspace_key is required')
     const workspaceKey = input.workspace_key
     const detail = await this.store.getTaskDetail(taskId, workspaceKey)
-    const actor = input.actor ?? detail.state.next_actor ?? 'claude'
+    const actor = input.actor
+      ?? (detail.state.status === 'FAILED' ? detail.state.latest_failure?.actor : undefined)
+      ?? detail.state.next_actor
+      ?? 'claude'
     const status = ACTOR_STATUS[actor]
     if (!status) throw new Error(`Unsupported actor: ${actor}`)
     const runId = `run_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`
     const startedAt = new Date().toISOString()
 
     await this.store.updateTaskState(taskId, workspaceKey, (state) => {
-      if (state.status !== 'READY' && state.status !== 'PAUSED') {
+      if (state.status !== 'READY' && state.status !== 'PAUSED' && state.status !== 'FAILED') {
         throw new Error(`Cannot start task from ${state.status}`)
       }
       return {
         ...state,
         status,
         active_run: { actor, started_at: startedAt },
+        latest_failure: null,
         updated_at: startedAt
       }
     })
