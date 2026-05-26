@@ -7,7 +7,7 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
-    "test": "vitest",
+    "test": "vitest run tests/unit",
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",
     "package": "electron-builder --mac",
