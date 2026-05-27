@@ -73,13 +73,11 @@ export const launcherSchema = z.object({
 
 export const taskSettingsSchema = z.object({
   protocol_version: z.string().default('1'),
-  countdown_seconds: z.number().default(30),
   flow_policy: z.string().default('claude_then_codex'),
   role_mode: z.string().default('claude_implements'),
   launchers: z.record(z.string(), launcherSchema).default({}),
   implementer_actor: z.string().optional(),
   reviewer_actor: z.string().optional(),
-  max_rounds: z.number().optional(),
   max_consecutive_failures: z.number().optional(),
   seed_claude_session_id: z.string().optional(),
   seed_codex_thread_id: z.string().optional(),
@@ -90,7 +88,7 @@ export const taskSettingsSchema = z.object({
 export const globalSettingsSchema = z.object({
   protocol_version: z.string().default('1'),
   countdown_seconds: z.number().default(30),
-  max_rounds: z.number().default(10),
+  max_rounds: z.number().default(9999),
   max_consecutive_failures: z.number().default(3),
   launchers: z.record(z.string(), launcherSchema).default({}),
   seed_claude_session_id: z.string().optional(),

@@ -36,10 +36,8 @@ describe('BuddyStore writes', () => {
     const settings = JSON.parse(await readFile(join(taskDir, 'settings.json'), 'utf8'))
     expect(settings).toMatchObject({
       protocol_version: '1',
-      countdown_seconds: 30,
       flow_policy: 'claude_then_codex',
       role_mode: 'claude_implements',
-      max_rounds: 10,
       max_consecutive_failures: 3,
       seed_claude_session_id: '',
       seed_codex_thread_id: '',
@@ -102,12 +100,32 @@ describe('BuddyStore writes', () => {
 
     const taskDir = join(root, 'workspaces', result.workspace_key, 'tasks', 'demo')
     const settings = JSON.parse(await readFile(join(taskDir, 'settings.json'), 'utf8'))
-    expect(settings.countdown_seconds).toBe(12)
     expect(settings.launchers.codex).toEqual({
       command: 'codex --profile native',
       env: { BUDDY_MODE: 'native' },
       timeout_seconds: 123
     })
+  })
+
+  it('deduplicates task IDs by appending numeric suffixes', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'buddy-write-dedup-'))
+    const repoRoot = await mkdtemp(join(tmpdir(), 'buddy-write-dedup-repo-'))
+    const store = new BuddyStore(root)
+
+    const first = await store.createTask({ task_id: 'demo', repo_root: repoRoot })
+    expect(first.task).toBe('demo')
+
+    const second = await store.createTask({ task_id: 'demo', repo_root: repoRoot })
+    expect(second.task).toBe('demo_2')
+
+    const third = await store.createTask({ task_id: 'demo', repo_root: repoRoot })
+    expect(third.task).toBe('demo_3')
+
+    // Verify all three tasks exist with their own directories
+    for (const id of ['demo', 'demo_2', 'demo_3']) {
+      const taskDir = join(root, 'workspaces', first.workspace_key, 'tasks', id)
+      await expect(access(join(taskDir, 'settings.json'))).resolves.toBeUndefined()
+    }
   })
 
   it('appends transcript rows using buddy-python jsonl formatting and state sequence', async () => {

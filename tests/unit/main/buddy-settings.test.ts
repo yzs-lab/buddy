@@ -12,7 +12,7 @@ describe('BuddyStore settings and delete', () => {
     await expect(store.readGlobalSettings()).resolves.toMatchObject({
       protocol_version: '1',
       countdown_seconds: 30,
-      max_rounds: 10,
+      max_rounds: 9999,
       max_consecutive_failures: 3,
       launchers: {
         claude: { command: 'claude', env: {}, timeout_seconds: 7200 },

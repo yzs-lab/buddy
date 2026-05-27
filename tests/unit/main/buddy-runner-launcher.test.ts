@@ -172,11 +172,11 @@ describe('BuddyRunner with fake launcher', () => {
     ].join('\n'))
 
     const store = new BuddyStore(root)
+    await store.updateGlobalSettings({ max_rounds: 1 })
     const created = await store.createTask({
       task_id: 'demo',
       repo_root: root,
       settings: {
-        max_rounds: 1,
         launchers: {
           claude: { command: `${process.execPath} ${fake}`, env: {}, timeout_seconds: 5 }
         }
@@ -254,11 +254,11 @@ describe('BuddyRunner with fake launcher', () => {
     ].join('\n'))
 
     const store = new BuddyStore(root)
+    await store.updateGlobalSettings({ countdown_seconds: 1 })
     const created = await store.createTask({
       task_id: 'demo',
       repo_root: root,
       settings: {
-        countdown_seconds: 1,
         launchers: {
           claude: { command: `${process.execPath} ${fake}`, env: {}, timeout_seconds: 5 },
           codex: { command: `${process.execPath} ${fake}`, env: {}, timeout_seconds: 5 }

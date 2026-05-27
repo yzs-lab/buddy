@@ -326,16 +326,9 @@ function SettingsSummary({
   const display = (v?: string) => actorLabel(v, t)
   const repoRoot = taskState?.repo_root || '-'
 
-  const countdownSeconds = settings?.countdown_seconds ?? 30
-  const maxRounds = settings?.max_rounds ?? 10
-
   const rows: Array<[string, string]> = [
     [t('statusBar.summary.implementer'), display(impl)],
     [t('statusBar.summary.reviewer'), display(rev)],
-    [
-      t('statusBar.summary.timing'),
-      t('statusBar.summary.timingValue', { seconds: countdownSeconds, rounds: maxRounds })
-    ],
     [t('statusBar.summary.repoRoot'), repoRoot]
   ]
 

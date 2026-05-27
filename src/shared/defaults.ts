@@ -51,7 +51,7 @@ export function normalizeGlobalSettings(settings?: GlobalSettings | null): Globa
   return {
     protocol_version: settings?.protocol_version ?? '1',
     countdown_seconds: settings?.countdown_seconds ?? 30,
-    max_rounds: settings?.max_rounds ?? 10,
+    max_rounds: settings?.max_rounds ?? 9999,
     max_consecutive_failures: settings?.max_consecutive_failures ?? 3,
     launchers: normalizeLaunchers(settings?.launchers),
     seed_claude_session_id: settings?.seed_claude_session_id ?? '',

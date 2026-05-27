@@ -145,10 +145,8 @@ const en = {
 
   'settings.collab.title': 'Default collaboration',
   'settings.collab.desc': 'Default values used when creating a task',
-  'settings.collab.countdown.title': 'Countdown (seconds)',
-  'settings.collab.countdown.desc': 'Wait time before role hand-off',
-  'settings.collab.maxRounds.title': 'Auto rounds',
-  'settings.collab.maxRounds.desc': 'Maximum collaboration rounds for a task',
+  'settings.collab.maxRounds.title': 'Max session rounds',
+  'settings.collab.maxRounds.desc': 'Maximum collaboration rounds per session (-1 = unlimited)',
   'settings.collab.timeout.title': 'Launcher timeout (seconds)',
   'settings.collab.timeout.desc': 'Maximum runtime of a launcher, shared across all CLIs',
 
@@ -209,10 +207,6 @@ const en = {
   'statusBar.summary.implementer': 'Implementer',
   'statusBar.summary.reviewer': 'Reviewer',
   'statusBar.summary.repoRoot': 'Working dir',
-  'statusBar.summary.launchCmd': 'Launch command',
-  'statusBar.summary.launchCmdCustom': 'Custom command',
-  'statusBar.summary.timing': 'Countdown / Auto rounds',
-  'statusBar.summary.timingValue': '{seconds}s · {rounds} rounds',
 
   // Create task modal
   'modal.create.title': 'New task',
@@ -222,8 +216,6 @@ const en = {
   'modal.create.taskNameError': 'Only letters, digits, CJK, dots, underscores, dashes, spaces, and brackets, max 64 chars',
   'modal.create.repoRoot': 'Working directory',
   'modal.create.repoRootSelect': 'Select directory',
-  'modal.create.maxRounds': 'Auto rounds',
-  'modal.create.countdown': 'Countdown (seconds)',
   'modal.create.implementer': 'Implementer',
   'modal.create.reviewer': 'Reviewer',
   'modal.create.implementerSession': 'Implementer session ID',
@@ -342,10 +334,8 @@ const zhCN: typeof en = {
 
   'settings.collab.title': '默认协作参数',
   'settings.collab.desc': '新建任务时使用的默认参数',
-  'settings.collab.countdown.title': '倒计时（秒）',
-  'settings.collab.countdown.desc': '角色切换前的等待时间',
-  'settings.collab.maxRounds.title': '自动轮次',
-  'settings.collab.maxRounds.desc': '单个任务的最大协作轮数',
+  'settings.collab.maxRounds.title': '最大会话次数',
+  'settings.collab.maxRounds.desc': '单个会话的最大协作轮数（-1 表示不限制）',
   'settings.collab.timeout.title': '启动命令超时（秒）',
   'settings.collab.timeout.desc': '启动命令运行的最长时间，所有 CLI 共用',
 
@@ -400,10 +390,6 @@ const zhCN: typeof en = {
   'statusBar.summary.implementer': '执行方',
   'statusBar.summary.reviewer': 'Reviewer',
   'statusBar.summary.repoRoot': '工作目录',
-  'statusBar.summary.launchCmd': '启动命令',
-  'statusBar.summary.launchCmdCustom': '自定义命令',
-  'statusBar.summary.timing': '倒计时 / 自动轮次',
-  'statusBar.summary.timingValue': '{seconds}s · {rounds} 轮',
 
   'modal.create.title': '新建任务',
   'modal.create.taskName': '任务名称',
@@ -412,8 +398,6 @@ const zhCN: typeof en = {
   'modal.create.taskNameError': '只能使用中文、字母、数字、点、下划线、短横线、空格及「」【】{}等，最长 64 字符',
   'modal.create.repoRoot': '工作目录',
   'modal.create.repoRootSelect': '选择目录',
-  'modal.create.maxRounds': '自动轮次',
-  'modal.create.countdown': '倒计时（秒）',
   'modal.create.implementer': '执行方',
   'modal.create.reviewer': 'Reviewer',
   'modal.create.implementerSession': '执行方会话 ID',
@@ -532,10 +516,8 @@ const zhTW: typeof en = {
 
   'settings.collab.title': '預設協作參數',
   'settings.collab.desc': '新增任務時使用的預設參數',
-  'settings.collab.countdown.title': '倒數秒數',
-  'settings.collab.countdown.desc': '角色切換前的等待時間',
-  'settings.collab.maxRounds.title': '自動輪次',
-  'settings.collab.maxRounds.desc': '單一任務的最大協作輪數',
+  'settings.collab.maxRounds.title': '最大會話次數',
+  'settings.collab.maxRounds.desc': '單一會話的最大協作輪數（-1 表示不限制）',
   'settings.collab.timeout.title': '啟動指令逾時（秒）',
   'settings.collab.timeout.desc': '啟動指令執行的最長時間，所有 CLI 共用',
 
@@ -590,10 +572,6 @@ const zhTW: typeof en = {
   'statusBar.summary.implementer': '執行方',
   'statusBar.summary.reviewer': 'Reviewer',
   'statusBar.summary.repoRoot': '工作目錄',
-  'statusBar.summary.launchCmd': '啟動指令',
-  'statusBar.summary.launchCmdCustom': '自訂指令',
-  'statusBar.summary.timing': '倒數 / 自動輪次',
-  'statusBar.summary.timingValue': '{seconds}s · {rounds} 輪',
 
   'modal.create.title': '新增任務',
   'modal.create.taskName': '任務名稱',
@@ -602,8 +580,6 @@ const zhTW: typeof en = {
   'modal.create.taskNameError': '只能使用中文、字母、數字、點、底線、短橫線、空格及「」【】{}等，最長 64 字元',
   'modal.create.repoRoot': '工作目錄',
   'modal.create.repoRootSelect': '選擇目錄',
-  'modal.create.maxRounds': '自動輪次',
-  'modal.create.countdown': '倒數秒數',
   'modal.create.implementer': '執行方',
   'modal.create.reviewer': 'Reviewer',
   'modal.create.implementerSession': '執行方工作階段 ID',

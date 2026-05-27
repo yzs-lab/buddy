@@ -28,10 +28,11 @@ describe('buildActorPrompt', () => {
       transcript: [],
       settings: {
         role_mode: 'claude_implements',
-        max_rounds: 10,
-        countdown_seconds: 30,
         flow_policy: 'claude_then_codex',
         launchers: {}
+      },
+      globalSettings: {
+        max_rounds: 10
       },
       state: {
         round: 4,
@@ -61,8 +62,6 @@ describe('buildActorPrompt', () => {
       transcript: [],
       settings: {
         role_mode: 'codex_implements',
-        max_rounds: 10,
-        countdown_seconds: 30,
         flow_policy: 'claude_then_codex',
         launchers: {}
       },
@@ -83,8 +82,6 @@ describe('buildActorPrompt', () => {
       transcript: [],
       settings: {
         role_mode: 'claude_implements',
-        max_rounds: 10,
-        countdown_seconds: 30,
         flow_policy: 'claude_then_codex',
         launchers: {}
       },
@@ -121,8 +118,6 @@ describe('buildActorPrompt', () => {
       transcript,
       settings: {
         role_mode: 'claude_implements',
-        max_rounds: 10,
-        countdown_seconds: 30,
         flow_policy: 'claude_then_codex',
         launchers: {}
       },
@@ -147,8 +142,6 @@ describe('buildActorPrompt', () => {
       userMessage: '请修复这个问题',
       settings: {
         role_mode: 'claude_implements',
-        max_rounds: 10,
-        countdown_seconds: 30,
         flow_policy: 'claude_then_codex',
         launchers: {}
       },

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import type { TaskSettings, TaskState, TranscriptEntry } from '../../shared/types'
+import type { GlobalSettings, TaskSettings, TaskState, TranscriptEntry } from '../../shared/types'
 
 const ACTOR_CLAUDE = 'claude'
 const ACTOR_CODEX = 'codex'
@@ -42,6 +42,7 @@ export interface BuildActorPromptInput {
   transcript: TranscriptEntry[]
   settings?: Partial<TaskSettings>
   state?: Partial<TaskState>
+  globalSettings?: Partial<GlobalSettings>
   userMessage?: string
 }
 
@@ -87,7 +88,7 @@ export function buildActorPrompt(input: BuildActorPromptInput): string {
   }
 
   parts.push('', '## Runtime settings')
-  parts.push(...runtimeSettingsLines(settings, state, input.actor, input.repoRoot))
+  parts.push(...runtimeSettingsLines(settings, state, input.globalSettings, input.actor, input.repoRoot))
 
   const recent = selectRecentTranscript(input.transcript)
   if (recent.length > 0) {
@@ -121,15 +122,16 @@ export function buildActorPrompt(input: BuildActorPromptInput): string {
 export function runtimeSettingsLines(
   settings: Partial<TaskSettings>,
   state: Partial<TaskState>,
+  globalSettings: Partial<GlobalSettings> | undefined,
   actor: string,
   repoRoot = ''
 ): string[] {
-  const maxRounds = numberValue(settings.max_rounds, 10)
+  const maxRounds = numberValue(globalSettings?.max_rounds, 9999)
   const roundsInWindow = numberValue(state.rounds_in_window, 0)
-  const remaining = maxRounds > 0 ? Math.max(0, maxRounds - roundsInWindow) : 'unlimited'
+  const remaining = maxRounds === -1 ? 'unlimited' : (maxRounds > 0 ? Math.max(0, maxRounds - roundsInWindow) : 'unlimited')
   const lines = [
     `- Current total round: ${numberValue(state.round, 0)}`,
-    `- Automatic rounds used in this window: ${roundsInWindow}/${maxRounds || 'unlimited'}`,
+    `- Automatic rounds used in this window: ${roundsInWindow}/${maxRounds === -1 ? 'unlimited' : maxRounds}`,
     `- Automatic rounds remaining in this window: ${remaining}`,
     `- Next actor after this turn: ${nextActor(actor, settings)}`
   ]

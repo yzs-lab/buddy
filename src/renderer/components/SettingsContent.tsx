@@ -197,25 +197,13 @@ function GeneralSettings({ globalSettings }: { globalSettings: GlobalSettings | 
         <p className="text-sm text-fg-secondary mb-3">{t('settings.collab.desc')}</p>
         <SettingsList>
           <SettingsRow
-            title={t('settings.collab.countdown.title')}
-            description={t('settings.collab.countdown.desc')}
-            right={
-              <EditableNumber
-                value={globalSettings?.countdown_seconds ?? 30}
-                min={0}
-                max={600}
-                onSave={(v) => save({ countdown_seconds: v })}
-              />
-            }
-          />
-          <SettingsRow
             title={t('settings.collab.maxRounds.title')}
             description={t('settings.collab.maxRounds.desc')}
             right={
               <EditableNumber
-                value={globalSettings?.max_rounds ?? 10}
-                min={1}
-                max={50}
+                value={globalSettings?.max_rounds ?? 9999}
+                min={-1}
+                max={999999}
                 onSave={(v) => save({ max_rounds: v })}
               />
             }

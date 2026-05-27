@@ -77,13 +77,11 @@ export interface ActiveRun {
 
 export interface TaskSettings {
   protocol_version: string
-  countdown_seconds: number
   flow_policy: string
   role_mode: string
   launchers: Record<string, Launcher>
   implementer_actor?: string
   reviewer_actor?: string
-  max_rounds?: number
   max_consecutive_failures?: number
   seed_claude_session_id?: string
   seed_codex_thread_id?: string

@@ -18,12 +18,10 @@ function readyTask(round: number): TaskDetail {
     },
     settings: {
       protocol_version: '1',
-      countdown_seconds: 10,
       flow_policy: 'claude_then_codex',
       role_mode: 'claude_implements',
       implementer_actor: 'claude',
       reviewer_actor: 'codex',
-      max_rounds: 10,
       launchers: {
         claude: { command: 'claude', env: {}, timeout_seconds: 7200 },
         codex: { command: 'codex', env: {}, timeout_seconds: 7200 }
@@ -116,7 +114,7 @@ describe('ChatArea ready task controls', () => {
       />
     )
 
-    expect(html).toContain('title="Start"')
+    expect(html).toContain('title="开始"')
   })
 
   it('shows the auto-start countdown for a newly-created READY task at round 1', () => {
@@ -132,6 +130,6 @@ describe('ChatArea ready task controls', () => {
       />
     )
 
-    expect(html).toContain('Auto-starting in 5s')
+    expect(html).toMatch(/5\s*秒后自动开始|Auto-starting in 5s/)
   })
 })

@@ -66,10 +66,10 @@ describe('BuddyRunner state transitions', () => {
   it('pauses before starting when the automatic round window is already exhausted', async () => {
     const root = await mkdtemp(join(tmpdir(), 'buddy-runner-round-window-start-'))
     const store = new BuddyStore(root)
+    await store.updateGlobalSettings({ max_rounds: 1 })
     const created = await store.createTask({
       task_id: 'demo',
-      repo_root: '/tmp/repo',
-      settings: { max_rounds: 1 }
+      repo_root: '/tmp/repo'
     })
     await store.updateTaskState('demo', created.workspace_key, (state) => ({
       ...state,

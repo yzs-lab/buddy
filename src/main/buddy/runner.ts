@@ -3,6 +3,7 @@ import { access, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type {
   CountdownInput,
+  GlobalSettings,
   SendMessageInput,
   StartTaskInput,
   TaskSettings,
@@ -40,6 +41,7 @@ export class BuddyRunner {
     if (!input.workspace_key) throw new Error('workspace_key is required')
     const workspaceKey = input.workspace_key
     const detail = await this.store.getTaskDetail(taskId, workspaceKey)
+    const globalSettings = await this.store.readGlobalSettings()
     const actor = input.actor
       ?? (detail.state.status === 'FAILED' ? (detail.state.latest_failure?.actor ?? detail.state.last_error?.actor) : undefined)
       ?? detail.state.next_actor
@@ -49,7 +51,7 @@ export class BuddyRunner {
     if (!canStartFrom(detail.state.status)) {
       throw new Error(`Cannot start task from ${detail.state.status}`)
     }
-    const maxRounds = detail.settings.max_rounds ?? 10
+    const maxRounds = globalSettings.max_rounds ?? 9999
     const roundsInWindow = detail.state.rounds_in_window ?? 0
     if (maxRounds > 0 && roundsInWindow >= maxRounds) {
       await this.store.updateTaskState(taskId, workspaceKey, (state) => ({
@@ -185,6 +187,7 @@ export class BuddyRunner {
 
   private async executeActor(taskId: string, workspaceKey: string, actor: string, runId: string, userMessage = ''): Promise<void> {
     const detail = await this.store.getTaskDetail(taskId, workspaceKey)
+    const globalSettings = await this.store.readGlobalSettings()
     const launcher = detail.settings.launchers[actor] ?? {
       command: actor,
       env: {},
@@ -202,6 +205,7 @@ export class BuddyRunner {
       transcript: detail.transcript,
       settings: detail.settings,
       state: detail.state,
+      globalSettings,
       userMessage
     })
     const promptFile = join(artifactsDir, `${runId}-prompt.md`)
@@ -296,10 +300,11 @@ export class BuddyRunner {
     const threadId = lastValue(parsedLines.map((line) => line.threadId))
     const message = parseBuddyMessage(text)
     const detail = await this.store.getTaskDetail(taskId, workspaceKey)
+    const globalSettings = await this.store.readGlobalSettings()
     const nextActor = nextActorForSettings(actor, detail.settings)
     const round = (detail.state.round ?? 0) + 1
     const roundsInWindow = (detail.state.rounds_in_window ?? 0) + 1
-    const maxRounds = detail.settings.max_rounds ?? 10
+    const maxRounds = globalSettings.max_rounds ?? 9999
     const roundWindowReached = maxRounds > 0 && roundsInWindow >= maxRounds
     const now = new Date().toISOString()
     const buddyType = message.kind === 'break' ? 'break' : 'chat'
@@ -361,9 +366,9 @@ export class BuddyRunner {
             status: 'running',
             started_at: now,
             after_actor: actor,
-            remaining: detail.settings.countdown_seconds,
+            remaining: globalSettings.countdown_seconds ?? 30,
             default_next_actor: nextActor,
-            deadline: new Date(Date.now() + detail.settings.countdown_seconds * 1000).toISOString()
+            deadline: new Date(Date.now() + (globalSettings.countdown_seconds ?? 30) * 1000).toISOString()
           }
         }
       }
@@ -376,9 +381,9 @@ export class BuddyRunner {
           status: 'running',
           started_at: now,
           after_actor: actor,
-          remaining: detail.settings.countdown_seconds,
+          remaining: globalSettings.countdown_seconds ?? 30,
           default_next_actor: nextActor,
-          deadline: new Date(Date.now() + detail.settings.countdown_seconds * 1000).toISOString()
+          deadline: new Date(Date.now() + (globalSettings.countdown_seconds ?? 30) * 1000).toISOString()
         }
       }
     })
@@ -471,7 +476,7 @@ export class BuddyRunner {
     await this.store.appendTaskEvent(taskId, workspaceKey, {
       type: 'countdown.started',
       payload: {
-        seconds: detail.settings.countdown_seconds,
+        seconds: globalSettings.countdown_seconds ?? 30,
         after_actor: actor,
         default_next_actor: nextActor
       }

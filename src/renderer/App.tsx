@@ -428,8 +428,6 @@ function CreateTaskModal({
   const [implementerSession, setImplementerSession] = useState('')
   const [reviewerSession, setReviewerSession] = useState('')
   const normalizedGlobalSettings = normalizeGlobalSettings(globalSettings)
-  const [maxRounds, setMaxRounds] = useState<number>(normalizedGlobalSettings.max_rounds ?? 10)
-  const [countdownSeconds, setCountdownSeconds] = useState<number>(normalizedGlobalSettings.countdown_seconds ?? 30)
 
   const TASK_NAME_RE = /^[a-zA-Z0-9一-鿿㐀-䶿""「」【】{}][a-zA-Z0-9一-鿿㐀-䶿 ._\-""「」【】{}]{0,63}$/
   const taskIdError = taskId.trim() && !TASK_NAME_RE.test(taskId.trim())
@@ -455,12 +453,10 @@ function CreateTaskModal({
     })
     const settings: Record<string, unknown> = {
       protocol_version: normalizedGlobalSettings.protocol_version ?? '1',
-      countdown_seconds: countdownSeconds,
       flow_policy: 'claude_then_codex',
       role_mode: implementer === 'codex' ? 'codex_implements' : 'claude_implements',
       implementer_actor: implementer,
       reviewer_actor: reviewer,
-      max_rounds: maxRounds,
       max_consecutive_failures: normalizedGlobalSettings.max_consecutive_failures ?? 3,
       launchers: {
         claude: launcherFor('claude'),
@@ -546,32 +542,6 @@ function CreateTaskModal({
                 <FolderOpen size={14} strokeWidth={1.75} />
                 {t('common.select')}
               </button>
-            </div>
-          </div>
-
-          {/* 自动轮次 / 倒计时 */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-fg mb-1">{t('modal.create.maxRounds')}</label>
-              <input
-                type="number"
-                min={1}
-                max={50}
-                value={maxRounds}
-                onChange={(e) => setMaxRounds(Math.max(1, Math.min(50, Number(e.target.value) || 1)))}
-                className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent bg-bg text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-fg mb-1">{t('modal.create.countdown')}</label>
-              <input
-                type="number"
-                min={0}
-                max={600}
-                value={countdownSeconds}
-                onChange={(e) => setCountdownSeconds(Math.max(0, Math.min(600, Number(e.target.value) || 0)))}
-                className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent bg-bg text-sm"
-              />
             </div>
           </div>
 

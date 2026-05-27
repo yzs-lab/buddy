@@ -1,4 +1,5 @@
 import {
+  access,
   mkdir,
   readFile,
   readdir,
@@ -91,14 +92,15 @@ export class BuddyStore {
   async createTask(input: CreateTaskInput): Promise<CreateTaskResult> {
     const repoRoot = canonicalRepoRoot(input.repo_root ?? '')
     const workspaceKey = workspaceKeyForRepo(repoRoot || input.task_id)
-    const dir = this.taskDirectory(input.task_id, workspaceKey)
+    const taskId = await deduplicateTaskId(input.task_id, this.taskDirectory.bind(this), workspaceKey)
+    const dir = this.taskDirectory(taskId, workspaceKey)
     const now = utcNow()
     const taskText = taskMarkdownContent(input.task_text ?? '')
     const contextText = contextMarkdownContent(input.context_text ?? '')
 
     const globalSettings = await this.readGlobalSettings()
     const settings = defaultTaskSettings(globalSettings, input.settings)
-    const state = defaultTaskState(input.task_id, repoRoot, settings, contextText, now)
+    const state = defaultTaskState(taskId, repoRoot, settings, contextText, now)
     state.event_seq = 1
 
     await mkdir(join(dir, 'rounds'), { recursive: true })
@@ -112,15 +114,15 @@ export class BuddyStore {
     await atomicAppendText(join(dir, '.buddy.lock'), '')
     await appendEventLine(join(dir, 'events.jsonl'), {
       seq: 1,
-      task_id: input.task_id,
+      task_id: taskId,
       type: 'task.created',
       ts: now,
       payload: {
-        task_id: input.task_id
+        task_id: taskId
       }
     })
 
-    return { task: input.task_id, path: dir, workspace_key: workspaceKey }
+    return { task: taskId, path: dir, workspace_key: workspaceKey }
   }
 
   async deleteTask(taskId: string, workspaceKey: string): Promise<void> {
@@ -439,10 +441,8 @@ function defaultTaskSettings(
 
   return {
     protocol_version: normalizedGlobal.protocol_version ?? '1',
-    countdown_seconds: normalizedGlobal.countdown_seconds ?? 30,
     flow_policy: 'claude_then_codex',
     role_mode: 'claude_implements',
-    max_rounds: normalizedGlobal.max_rounds,
     max_consecutive_failures: normalizedGlobal.max_consecutive_failures,
     launchers,
     seed_claude_session_id: normalizedGlobal.seed_claude_session_id ?? '',
@@ -473,6 +473,28 @@ function coerceLauncherOverrides(value: unknown): Record<string, Partial<Launche
 
 function isNotFoundError(error: unknown): boolean {
   return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT'
+}
+
+async function directoryExists(path: string): Promise<boolean> {
+  try {
+    await access(path)
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function deduplicateTaskId(
+  baseId: string,
+  taskDirOf: (id: string, ws: string) => string,
+  workspaceKey: string
+): Promise<string> {
+  if (!await directoryExists(taskDirOf(baseId, workspaceKey))) return baseId
+  for (let i = 2; i <= 999; i++) {
+    const candidate = `${baseId}_${i}`
+    if (!await directoryExists(taskDirOf(candidate, workspaceKey))) return candidate
+  }
+  throw new Error(`Cannot deduplicate task ID: ${baseId}`)
 }
 
 function defaultTaskState(

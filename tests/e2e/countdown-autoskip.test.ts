@@ -52,12 +52,10 @@ test('auto-skips a running countdown once when its deadline elapses', async ({ p
           },
           settings: {
             protocol_version: '1',
-            countdown_seconds: 1,
             flow_policy: 'claude_then_codex',
             role_mode: 'claude_implements',
             implementer_actor: 'claude',
             reviewer_actor: 'codex',
-            max_rounds: 10,
             launchers: {
               claude: { command: 'claude', env: {}, timeout_seconds: 7200 },
               codex: { command: 'codex', env: {}, timeout_seconds: 7200 }
