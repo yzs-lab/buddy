@@ -177,7 +177,7 @@ export const PRESET_THEMES: BuddyTheme[] = [
     type: 'light',
     surface: '#f3f3f1',
     ink: '#1c1c1a',
-    accent: '#339cff',
+    accent: '#6b6b66',
     success: '#00a240',
     danger: '#ba2623',
     contrast: 45,

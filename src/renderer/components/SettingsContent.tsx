@@ -380,32 +380,32 @@ function AppearanceSettings() {
 
       {/* Color Scheme */}
       <SettingsSection title={t('settings.appearance.scheme.title')} description={t('settings.appearance.scheme.desc')}>
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-8 gap-2">
           {availableThemes.map((theme) => {
             const active = themeId === theme.id
             return (
               <button
                 key={theme.id}
                 onClick={() => handleSelectTheme(theme.id)}
-                className={`relative p-3 rounded-xl border text-left transition-colors ${
+                className={`relative p-2 rounded-lg border text-left transition-colors ${
                   active
                     ? 'border-accent-primary ring-1 ring-accent-primary'
                     : 'border-border hover:border-fg-muted'
                 }`}
                 style={{ backgroundColor: theme.surface }}
               >
-                <div className="h-8 rounded-md mb-2 flex items-end gap-1 px-1 pb-1">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: theme.accent }} />
+                <div className="h-6 rounded mb-1.5 flex items-end gap-1 px-0.5 pb-0.5">
+                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: theme.accent }} />
                   <div className="flex-1 h-0.5 rounded" style={{ backgroundColor: theme.ink }} />
                 </div>
-                <div className="text-xs font-medium truncate" style={{ color: theme.ink }}>
+                <div className="text-[10px] font-medium truncate" style={{ color: theme.ink }}>
                   {theme.name}
                 </div>
                 {active && (
-                  <div className="absolute top-2 right-2 w-3 h-3 rounded-full border-2 flex items-center justify-center"
+                  <div className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full border-2 flex items-center justify-center"
                     style={{ borderColor: theme.accent, backgroundColor: theme.accent }}
                   >
-                    <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: theme.surface }} />
+                    <div className="w-1 h-1 rounded-full" style={{ backgroundColor: theme.surface }} />
                   </div>
                 )}
               </button>
