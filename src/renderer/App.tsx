@@ -423,8 +423,12 @@ function CreateTaskModal({
   const [taskId, setTaskId] = useState('')
   const [repoRoot, setRepoRoot] = useState(defaultRepoRoot)
   const [taskText, setTaskText] = useState(() => t('modal.create.taskBriefDefault'))
-  const [implementer, setImplementer] = useState<Actor>('claude')
-  const [reviewer, setReviewer] = useState<Actor>('codex')
+  const [implementer, setImplementer] = useState<Actor>(() => {
+    try { return (localStorage.getItem('buddy.lastImplementer') as Actor) || 'claude' } catch { return 'claude' }
+  })
+  const [reviewer, setReviewer] = useState<Actor>(() => {
+    try { return (localStorage.getItem('buddy.lastReviewer') as Actor) || 'codex' } catch { return 'codex' }
+  })
   const [implementerSession, setImplementerSession] = useState('')
   const [reviewerSession, setReviewerSession] = useState('')
   const normalizedGlobalSettings = normalizeGlobalSettings(globalSettings)
@@ -445,6 +449,10 @@ function CreateTaskModal({
 
   const handleSubmit = () => {
     if (!canSubmit) return
+    try {
+      localStorage.setItem('buddy.lastImplementer', implementer)
+      localStorage.setItem('buddy.lastReviewer', reviewer)
+    } catch {}
     const launchers = normalizedGlobalSettings.launchers ?? {}
     const launcherFor = (actor: Actor) => ({
       command: launchers[actor]?.command ?? defaultLauncherFor(actor).command,
@@ -545,7 +553,7 @@ function CreateTaskModal({
             </div>
           </div>
 
-          {/* 执行方 / Reviewer */}
+          {/* 执行者 / 审查者 */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-fg mb-1">{t('modal.create.implementer')}</label>

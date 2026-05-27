@@ -147,6 +147,8 @@ export interface GlobalSettings {
   launchers?: Record<string, Launcher>
   seed_claude_session_id?: string
   seed_codex_thread_id?: string
+  seed_opencode_session_id?: string
+  seed_kimi_session_id?: string
 }
 
 export interface BuddyError {

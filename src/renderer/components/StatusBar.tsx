@@ -132,6 +132,7 @@ export function StatusBar({
               <ActorCard
                 key={actor}
                 actor={actor}
+                taskSettings={taskSettings}
                 taskState={taskState}
                 running={runningActor === actor}
                 t={t}
@@ -174,15 +175,6 @@ export function StatusBar({
           )}
 
         </section>
-
-        {/* 任务设置 */}
-        <details open className="border-b border-border">
-          <summary className="px-4 py-3 text-sm font-semibold cursor-pointer flex items-center justify-between hover:bg-bg-subtle select-none">
-            <span>{t('statusBar.taskSettings')}</span>
-            <span className="text-xs font-normal text-fg-secondary">{t('common.collapse')}</span>
-          </summary>
-          <SettingsSummary settings={taskSettings} taskState={taskState} t={t} />
-        </details>
 
         {/* 过程事件 */}
         <details open className="border-b border-border">
@@ -277,17 +269,24 @@ function truncate(text: string, max: number): string {
 
 function ActorCard({
   actor,
+  taskSettings,
   taskState,
   running,
   t
 }: {
   actor: Actor
+  taskSettings: TaskSettings | null
   taskState: TaskState | null
   running: boolean
   t: TFunction
 }) {
   const sessionField = SESSION_FIELD[actor]
   const session = (taskState?.[sessionField] as string | undefined) || ''
+  const { impl, rev } = taskActors(taskSettings)
+  const roleKey: TranslationKey | null =
+    actor === impl ? 'statusBar.summary.implementer'
+    : actor === rev ? 'statusBar.summary.reviewer'
+    : null
 
   const handleCopy = () => {
     if (!session) return
@@ -296,7 +295,10 @@ function ActorCard({
 
   return (
     <div className={`rounded-lg border border-border-subtle p-3 ${running ? 'bg-bg-subtle' : 'bg-bg-elevated'}`}>
-      <div className="text-sm font-medium mb-1.5">{ACTOR_DISPLAY_NAME[actor]}</div>
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-sm font-medium">{ACTOR_DISPLAY_NAME[actor]}</span>
+        {roleKey && <span className="text-xs text-fg-secondary">{t(roleKey)}</span>}
+      </div>
       <div className="flex items-center justify-between gap-2 text-xs text-fg-secondary">
         <span className="min-w-0 truncate">{t('statusBar.actor.session', { id: session || '-' })}</span>
         {session && (
@@ -310,37 +312,6 @@ function ActorCard({
         )}
       </div>
     </div>
-  )
-}
-
-function SettingsSummary({
-  settings,
-  taskState,
-  t
-}: {
-  settings: TaskSettings | null
-  taskState: TaskState | null
-  t: TFunction
-}) {
-  const { impl, rev } = taskActors(settings)
-  const display = (v?: string) => actorLabel(v, t)
-  const repoRoot = taskState?.repo_root || '-'
-
-  const rows: Array<[string, string]> = [
-    [t('statusBar.summary.implementer'), display(impl)],
-    [t('statusBar.summary.reviewer'), display(rev)],
-    [t('statusBar.summary.repoRoot'), repoRoot]
-  ]
-
-  return (
-    <dl className="px-4 pb-3 space-y-1.5">
-      {rows.map(([label, value]) => (
-        <div key={label} className="flex justify-between gap-3 text-xs">
-          <dt className="text-fg-secondary flex-shrink-0">{label}</dt>
-          <dd className="font-medium text-right break-all">{value}</dd>
-        </div>
-      ))}
-    </dl>
   )
 }
 
