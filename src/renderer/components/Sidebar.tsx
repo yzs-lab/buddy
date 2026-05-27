@@ -449,24 +449,24 @@ function ChatSidebar({
                         <Ellipsis size={14} strokeWidth={2} />
                       </button>
                       {isMenuOpen && (
-                        <div className="absolute right-0 top-full mt-1 z-50 min-w-[160px] bg-bg-elevated border border-border rounded-lg shadow-lg py-1">
+                        <div className="absolute right-0 top-full mt-0.5 z-50 min-w-[168px] bg-bg border border-fg-muted/40 rounded-lg shadow-lg py-0.5 text-[13px]">
                           <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); setOpenMenuRepoRoot(null); setRenamingRepoRoot(repoRoot) }}
-                            className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-fg hover:bg-bg-subtle transition-colors"
+                            className="w-full flex items-center gap-2 px-3 py-[3px] text-fg hover:bg-bg-muted rounded-[4px] mx-0.5"
                           >
-                            <SquarePen size={14} strokeWidth={2} />
+                            <SquarePen size={13} strokeWidth={2} />
                             {t('sidebar.menuRename')}
                           </button>
                           <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); setOpenMenuRepoRoot(null); onOpenInFinder(repoRoot) }}
-                            className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-fg hover:bg-bg-subtle transition-colors"
+                            className="w-full flex items-center gap-2 px-3 py-[3px] text-fg hover:bg-bg-muted rounded-[4px] mx-0.5"
                           >
-                            <FolderOpen size={14} strokeWidth={2} />
+                            <FolderOpen size={13} strokeWidth={2} />
                             {t('sidebar.menuOpenInFinder')}
                           </button>
-                          <div className="my-1 border-t border-border-subtle" />
+                          <div className="my-0.5 border-t border-border-subtle" />
                           <button
                             type="button"
                             onClick={(e) => {
@@ -475,9 +475,9 @@ function ChatSidebar({
                               const ok = window.confirm(t('sidebar.confirmRemoveProject', { name: projectKey }))
                               if (ok) onRemoveProject(repoRoot)
                             }}
-                            className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-danger hover:bg-bg-subtle transition-colors"
+                            className="w-full flex items-center gap-2 px-3 py-[3px] text-danger hover:bg-bg-muted rounded-[4px] mx-0.5"
                           >
-                            <Trash2 size={14} strokeWidth={2} />
+                            <Trash2 size={13} strokeWidth={2} />
                             {t('sidebar.menuRemove')}
                           </button>
                         </div>
@@ -495,7 +495,7 @@ function ChatSidebar({
                   {!isExpanded ? null : workspaceTasks.length === 0 ? (
                     <div className="px-3 py-1.5 ml-2 text-xs text-fg-muted">{t('sidebar.noConversation')}</div>
                   ) : (
-                    <>
+                    <div className="pt-0.5">
                       {(expandedTaskProjects.has(projectKey) ? workspaceTasks : workspaceTasks.slice(0, 10)).map((task) => {
                       const isSelected = selectedTaskId === task.task_id
                       const isRunning = statusClass(task.status) === 'running'
@@ -559,7 +559,7 @@ function ChatSidebar({
                         {expandedTaskProjects.has(projectKey) ? t('sidebar.tasksCollapse') : t('sidebar.tasksExpand')}
                       </button>
                     )}
-                    </>
+                    </div>
                   )}
                 </div>
               )

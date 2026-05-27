@@ -163,7 +163,7 @@ function SendShortcutSelect({
       {open && createPortal(
         <div
           data-send-dropdown
-          className="fixed bg-bg-elevated border border-border rounded-lg shadow-lg z-[9999] py-1 min-w-[220px]"
+          className="fixed bg-bg border border-fg-muted/40 rounded-lg shadow-lg z-[9999] py-0.5 min-w-[220px] text-[13px]"
           style={{ top: pos.top, left: pos.left, width: btnRef.current?.getBoundingClientRect().width }}
         >
           {options.map(opt => (
@@ -171,7 +171,7 @@ function SendShortcutSelect({
               key={opt.value}
               type="button"
               onClick={() => { onChange(opt.value); setOpen(false) }}
-              className={`w-full flex items-center gap-1.5 px-3 py-1.5 text-sm hover:bg-bg-subtle transition-colors ${value === opt.value ? 'text-accent' : 'text-fg'}`}
+              className={`w-full flex items-center gap-1.5 px-3 py-[3px] hover:bg-bg-muted rounded-[4px] mx-0.5 transition-colors ${value === opt.value ? 'text-accent' : 'text-fg'}`}
             >
               <span className="w-6 text-right text-fg-muted shrink-0">{opt.symbol}</span>
               <span>{opt.text}</span>
