@@ -172,10 +172,24 @@ export function CommitModal({ gitStatus, repoRoot, onClose, onSuccess, onError }
   const isBusy = isStaging || isGenerating || isCommitting
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
+    <div
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+      onClick={onClose}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && message.trim() && !isBusy) {
+          e.preventDefault()
+          handleCommit()
+        }
+        if (e.key === 'Escape' && !isBusy) {
+          e.preventDefault()
+          onClose()
+        }
+      }}
+    >
       <div
         className="bg-bg-elevated rounded-xl shadow-xl w-[480px] max-h-[80vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
+        tabIndex={-1}
       >
         {/* 头部 */}
         <div className="px-5 py-3 border-b border-border flex items-center justify-between">
@@ -261,6 +275,18 @@ export function CommitModal({ gitStatus, repoRoot, onClose, onSuccess, onError }
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                  e.preventDefault()
+                  if (message.trim() && !isBusy) {
+                    handleCommit()
+                  }
+                }
+                if (e.key === 'Escape' && !isBusy) {
+                  e.preventDefault()
+                  onClose()
+                }
+              }}
               rows={6}
               placeholder={isGenerating ? t('git.generating') : t('git.commitMessagePlaceholder')}
               disabled={isGenerating}
@@ -274,9 +300,9 @@ export function CommitModal({ gitStatus, repoRoot, onClose, onSuccess, onError }
           <button
             onClick={onClose}
             disabled={isBusy}
-            className="px-4 py-1.5 text-xs text-fg hover:bg-bg-subtle rounded-lg transition-colors disabled:opacity-50"
+            className="px-4 py-1.5 text-xs text-fg hover:bg-bg-subtle rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1"
           >
-            {t('common.cancel')}
+            {t('common.cancel')} <span className="opacity-60">⎋</span>
           </button>
           <button
             onClick={handleCommit}
@@ -284,7 +310,7 @@ export function CommitModal({ gitStatus, repoRoot, onClose, onSuccess, onError }
             className="px-4 py-1.5 text-xs bg-accent-primary text-fg-inverse rounded-lg hover:bg-accent-primary-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
           >
             {isCommitting && <Loader2 size={12} className="animate-spin" />}
-            {isCommitting ? t('git.committing') : t('git.commit')}
+            {isCommitting ? t('git.committing') : t('git.commit')} <span className="opacity-60">⌘⏎</span>
           </button>
         </div>
       </div>
