@@ -13,6 +13,14 @@ import type {
   TaskDetail
 } from '../../shared/types'
 import { BuddyEventBus } from './events'
+import {
+  getGitStatus,
+  gitStageAll,
+  gitCommitAndPush,
+  gitDiffForCommitMessage,
+  generateCommitMessage
+} from './git'
+import type { GitStatusResult } from '../../shared/types'
 import { BuddyRunner } from './runner'
 import { BuddyStore } from './store'
 
@@ -93,6 +101,26 @@ export class BuddyCoreService {
 
   updateGlobalSettings(settings: GlobalSettings): Promise<GlobalSettings> {
     return this.store.updateGlobalSettings(settings)
+  }
+
+  gitStatus(repoRoot: string): Promise<GitStatusResult> {
+    return getGitStatus(repoRoot)
+  }
+
+  gitStageAll(repoRoot: string): Promise<void> {
+    return gitStageAll(repoRoot)
+  }
+
+  gitCommitAndPush(repoRoot: string, message: string, remote: string): Promise<{ commitHash: string }> {
+    return gitCommitAndPush(repoRoot, message, remote)
+  }
+
+  gitDiffForCommitMessage(repoRoot: string): Promise<string> {
+    return gitDiffForCommitMessage(repoRoot)
+  }
+
+  generateCommitMessage(repoRoot: string, actorCommand?: string): Promise<string> {
+    return generateCommitMessage(repoRoot, actorCommand)
   }
 
   async recoverInterruptedRuns(): Promise<void> {

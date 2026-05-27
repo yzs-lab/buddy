@@ -48,6 +48,16 @@ export function createBuddyPreloadApi(ipc: IpcLike) {
       ipc.invoke('buddy:getEvents', taskId, since, workspaceKey) as Promise<{ events: Event[] }>,
     updateGlobalSettings: (settings: GlobalSettings): Promise<GlobalSettings> =>
       ipc.invoke('buddy:updateGlobalSettings', settings) as Promise<GlobalSettings>,
+    gitStatus: (repoRoot: string): Promise<unknown> =>
+      ipc.invoke('buddy:gitStatus', repoRoot),
+    gitStageAll: (repoRoot: string): Promise<void> =>
+      ipc.invoke('buddy:gitStageAll', repoRoot) as Promise<void>,
+    gitCommitAndPush: (repoRoot: string, message: string, remote: string): Promise<unknown> =>
+      ipc.invoke('buddy:gitCommitAndPush', repoRoot, message, remote),
+    gitDiffForCommitMessage: (repoRoot: string): Promise<string> =>
+      ipc.invoke('buddy:gitDiffForCommitMessage', repoRoot) as Promise<string>,
+    generateCommitMessage: (repoRoot: string, actorCommand?: string): Promise<string> =>
+      ipc.invoke('buddy:generateCommitMessage', repoRoot, actorCommand) as Promise<string>,
     onTaskEvent: (callback: (payload: TaskEventEnvelope) => void): (() => void) => {
       const listener: Listener = (_event, payload) => callback(payload)
       ipc.on('buddy:event', listener)

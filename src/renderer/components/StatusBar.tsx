@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { Copy, Play, RotateCw } from 'lucide-react'
 import { TaskState, TaskSettings, TaskStatus, Event, Failure } from '../../shared/types'
 import { ResizeHandle } from './ResizeHandle'
+import { FileStatus as FileStatusSection, CommitModal } from './FileStatus'
+import { useGitStatus, type GitStatusResult } from '../hooks/useBuddy'
 import {
   ACTOR_DISPLAY_NAME,
   ACTOR_LABEL_KEY,
@@ -79,6 +81,11 @@ export function StatusBar({
     const id = setInterval(() => setTick(t => t + 1), 1000)
     return () => clearInterval(id)
   }, [])
+
+  const repoRoot = taskState?.repo_root || null
+  const { data: gitStatus, isLoading: isGitLoading } = useGitStatus(repoRoot)
+  const [showCommitModal, setShowCommitModal] = useState(false)
+  const [commitFeedback, setCommitFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   if (!isOpen) return null
 
@@ -177,6 +184,27 @@ export function StatusBar({
 
         </section>
 
+        {/* 文件状态 */}
+        <FileStatusSection
+          gitStatus={gitStatus}
+          isLoading={isGitLoading}
+          repoRoot={repoRoot}
+          onOpenCommit={() => { setCommitFeedback(null); setShowCommitModal(true) }}
+        />
+
+        {/* 提交反馈 */}
+        {commitFeedback && (
+          <div className={`px-4 py-2 text-xs ${commitFeedback.type === 'success' ? 'text-success-fg bg-success-bg' : 'text-danger bg-bg-subtle'}`}>
+            {commitFeedback.message}
+            <button
+              onClick={() => setCommitFeedback(null)}
+              className="ml-2 text-fg-muted hover:text-fg"
+            >
+              ×
+            </button>
+          </div>
+        )}
+
         {/* 过程事件 */}
         <details open className="border-b border-border">
           <summary className="px-4 py-3 text-sm font-semibold cursor-pointer flex items-center justify-between hover:bg-bg-subtle select-none">
@@ -186,6 +214,17 @@ export function StatusBar({
           <EventLog events={events} t={t} lang={lang} />
         </details>
       </div>
+
+      {/* 提交弹窗 */}
+      {showCommitModal && gitStatus && repoRoot && (
+        <CommitModal
+          gitStatus={gitStatus}
+          repoRoot={repoRoot}
+          onClose={() => setShowCommitModal(false)}
+          onSuccess={(msg) => { setCommitFeedback({ type: 'success', message: msg }); setShowCommitModal(false) }}
+          onError={(msg) => { setCommitFeedback({ type: 'error', message: msg }) }}
+        />
+      )}
     </div>
   )
 }

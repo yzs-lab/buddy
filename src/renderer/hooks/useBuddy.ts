@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../lib/api'
-import type { GlobalSettings } from '../../shared/types'
+import type { GlobalSettings, GitDiffStats, GitRemote, GitStatusResult } from '../../shared/types'
 
 export function useHealthCheck() {
   return useQuery({
@@ -156,6 +156,40 @@ export function useUpdateGlobalSettings() {
     mutationFn: (settings: GlobalSettings) => api.updateGlobalSettings(settings),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bootstrap'] })
+    }
+  })
+}
+
+export type { GitDiffStats, GitRemote, GitStatusResult } from '../../shared/types'
+
+export function useGitStatus(repoRoot: string | null | undefined) {
+  return useQuery({
+    queryKey: ['gitStatus', repoRoot],
+    queryFn: () => api.gitStatus(repoRoot!) as Promise<GitStatusResult>,
+    enabled: !!repoRoot,
+    refetchInterval: 10000
+  })
+}
+
+export function useGitStageAll() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (repoRoot: string) => api.gitStageAll(repoRoot),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['gitStatus'] })
+    }
+  })
+}
+
+export function useGitCommitAndPush() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ repoRoot, message, remote }: { repoRoot: string; message: string; remote: string }) =>
+      api.gitCommitAndPush(repoRoot, message, remote),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['gitStatus'] })
     }
   })
 }

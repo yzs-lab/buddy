@@ -1,7 +1,11 @@
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { StatusBar } from '../../../src/renderer/components/StatusBar'
 import type { TaskSettings, TaskState } from '../../../src/shared/types'
+
+vi.mock('../../../src/renderer/hooks/useBuddy', () => ({
+  useGitStatus: () => ({ data: null, isLoading: false })
+}))
 
 type StatusBarProps = Parameters<typeof StatusBar>[0]
 

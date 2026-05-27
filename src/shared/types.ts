@@ -194,3 +194,22 @@ export interface CountdownInput {
   next_actor?: string
   workspace_key?: string
 }
+
+export interface GitDiffStats {
+  filesChanged: number
+  insertions: number
+  deletions: number
+  summary: string
+}
+
+export interface GitRemote {
+  name: string
+  url: string
+}
+
+export interface GitStatusResult {
+  branch: string
+  diff: GitDiffStats | null
+  staged: GitDiffStats | null
+  remotes: GitRemote[]
+}

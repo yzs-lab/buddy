@@ -36,5 +36,15 @@ export const api = {
   getEvents: (taskId: string, since: number, workspaceKey?: string) =>
     buddy().getEvents(taskId, since, workspaceKey),
   updateGlobalSettings: (settings: GlobalSettings) =>
-    buddy().updateGlobalSettings(settings)
+    buddy().updateGlobalSettings(settings),
+  gitStatus: (repoRoot: string) =>
+    buddy().gitStatus(repoRoot),
+  gitStageAll: (repoRoot: string) =>
+    buddy().gitStageAll(repoRoot),
+  gitCommitAndPush: (repoRoot: string, message: string, remote: string) =>
+    buddy().gitCommitAndPush(repoRoot, message, remote),
+  gitDiffForCommitMessage: (repoRoot: string) =>
+    buddy().gitDiffForCommitMessage(repoRoot),
+  generateCommitMessage: (repoRoot: string, actorCommand?: string) =>
+    buddy().generateCommitMessage(repoRoot, actorCommand)
 }

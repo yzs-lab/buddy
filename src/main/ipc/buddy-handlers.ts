@@ -21,6 +21,11 @@ export interface BuddyHandlerService {
   interrupt(taskId: string, workspaceKey?: string): Promise<void>
   getEvents(taskId: string, since: number, workspaceKey?: string): Promise<unknown>
   updateGlobalSettings(settings: GlobalSettings): Promise<unknown>
+  gitStatus(repoRoot: string): Promise<unknown>
+  gitStageAll(repoRoot: string): Promise<void>
+  gitCommitAndPush(repoRoot: string, message: string, remote: string): Promise<unknown>
+  gitDiffForCommitMessage(repoRoot: string): Promise<string>
+  generateCommitMessage(repoRoot: string, actorCommand?: string): Promise<string>
 }
 
 type IpcHandle = Pick<IpcMain, 'handle'>
@@ -58,5 +63,20 @@ export function registerBuddyHandlers(ipcMain: IpcHandle, service: BuddyHandlerS
   )
   ipcMain.handle('buddy:updateGlobalSettings', (_event, settings: GlobalSettings) =>
     service.updateGlobalSettings(settings)
+  )
+  ipcMain.handle('buddy:gitStatus', (_event, repoRoot: string) =>
+    service.gitStatus(repoRoot)
+  )
+  ipcMain.handle('buddy:gitStageAll', (_event, repoRoot: string) =>
+    service.gitStageAll(repoRoot)
+  )
+  ipcMain.handle('buddy:gitCommitAndPush', (_event, repoRoot: string, message: string, remote: string) =>
+    service.gitCommitAndPush(repoRoot, message, remote)
+  )
+  ipcMain.handle('buddy:gitDiffForCommitMessage', (_event, repoRoot: string) =>
+    service.gitDiffForCommitMessage(repoRoot)
+  )
+  ipcMain.handle('buddy:generateCommitMessage', (_event, repoRoot: string, actorCommand?: string) =>
+    service.generateCommitMessage(repoRoot, actorCommand)
   )
 }
