@@ -19,6 +19,10 @@ set -euo pipefail
 VERSION="${1:?Usage: release.sh <version>  e.g. release.sh v1.2.0}"
 PACKAGE_VERSION="${VERSION#v}"
 
+# --- Resolve project root (script may be run from any directory) ---
+PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$PROJECT_ROOT"
+
 # --- Prerequisites ---
 command -v glab >/dev/null \
   || { echo "glab not found. Install: brew install glab && glab auth login" >&2; exit 1; }
