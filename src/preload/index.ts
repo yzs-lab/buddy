@@ -11,6 +11,11 @@ const api = {
     ipcRenderer.on('window:fullScreenChange', handler)
     return () => { ipcRenderer.removeListener('window:fullScreenChange', handler) }
   },
+  onMenuAction: (callback: (action: string) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, action: string) => callback(action)
+    ipcRenderer.on('menu:action', handler)
+    return () => { ipcRenderer.removeListener('menu:action', handler) }
+  },
   isFullScreen: (): Promise<boolean> =>
     ipcRenderer.invoke('window:isFullScreen'),
   readClipboardFilePaths: (): Promise<Array<{ path: string; size: number }>> =>

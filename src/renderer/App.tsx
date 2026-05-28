@@ -412,6 +412,27 @@ export default function App() {
     if (next) handleSelectTask(next.task_id, next.workspace_key)
   }, [handleSelectTask, projectNames, selectedTaskId, tasks])
 
+  // Listen for native menu actions
+  useEffect(() => {
+    const cleanup = window.api.onMenuAction((action: string) => {
+      if (action === 'newTask') {
+        handleOpenCreateModal()
+      } else if (action === 'openSettings') {
+        setView('settings')
+        setSettingsTab('general')
+      } else if (action === 'prevTask') {
+        selectVisibleTaskByOffset(-1)
+      } else if (action === 'nextTask') {
+        selectVisibleTaskByOffset(1)
+      } else if (action === 'toggleSidebar') {
+        setIsSidebarOpen(prev => !prev)
+      } else if (action === 'toggleStatusBar') {
+        setIsStatusBarOpen(prev => !prev)
+      }
+    })
+    return cleanup
+  }, [handleOpenCreateModal, selectVisibleTaskByOffset])
+
   const selectVisibleTaskBySlot = useCallback((slot: number) => {
     const visibleTasks = visibleTasksForShortcuts(
       tasks,

@@ -131,17 +131,78 @@ function parseBuddyJsonMessage(text: string): BuddyMessage | null {
   const parsed = parseBuddyJsonCandidate(text)
   if (parsed) return parsed
 
-  if (text.startsWith('{')) {
-    const loose = looseExtractBuddyMessage(text)
-    if (loose) return loose
+  const loose = looseExtractBuddyMessage(text)
+  if (loose) return loose
+
+  const obj = findBuddyJsonObject(text)
+  if (obj) {
+    const objParsed = parseBuddyJsonCandidate(obj)
+    if (objParsed) return objParsed
+    const objLoose = looseExtractBuddyMessage(obj)
+    if (objLoose) return objLoose
   }
 
-  const embedded = text.match(/\{[^{}]*"type"\s*:\s*"(?:chat|break)"[^{}]*\}/s)
-  if (embedded) {
-    return parseBuddyJsonCandidate(embedded[0])
+  const unescaped = tryUnescapeJson(text)
+  if (unescaped) {
+    const uobj = findBuddyJsonObject(unescaped) ?? unescaped
+    const uparsed = parseBuddyJsonCandidate(uobj)
+    if (uparsed) return uparsed
+    const uloose = looseExtractBuddyMessage(uobj)
+    if (uloose) return uloose
   }
 
   return null
+}
+
+function findBuddyJsonObject(text: string): string | null {
+  const match = text.match(/\{\s*"type"\s*:\s*"(chat|break)"/)
+  if (!match || match.index === undefined) return null
+
+  let depth = 0
+  let inString = false
+  let inBacktick = false
+  let escape = false
+  let start = match.index
+
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i]
+    if (inBacktick) {
+      if (ch === '`') inBacktick = false
+      continue
+    }
+    if (escape) { escape = false; continue }
+    if (ch === '\\') { escape = true; continue }
+    if (ch === '`' && !inString) { inBacktick = true; continue }
+    if (ch === '"') { inString = !inString; continue }
+    if (inString) continue
+    if (ch === '{') depth++
+    if (ch === '}') {
+      depth--
+      if (depth === 0) return text.slice(start, i + 1)
+    }
+  }
+
+  return null
+}
+
+function tryUnescapeJson(text: string): string | null {
+  if (!text.includes('\\"')) return null
+  const unescaped = text.replace(/\\"/g, '"')
+  if (!/\{\s*"type"\s*:\s*"(chat|break)"/.test(unescaped)) return null
+  return unescaped
+}
+
+function findClosingContentQuote(text: string): number {
+  const len = text.length
+  let pos = len - 1
+
+  while (pos >= 0 && (text[pos] === ' ' || text[pos] === '\t' || text[pos] === '\n' || text[pos] === '\r')) pos--
+  if (pos < 0 || text[pos] !== '}') return -1
+  pos--
+  while (pos >= 0 && (text[pos] === ' ' || text[pos] === '\t' || text[pos] === '\n' || text[pos] === '\r')) pos--
+  if (pos < 0 || text[pos] !== '"') return -1
+
+  return pos
 }
 
 function parseBuddyJsonCandidate(text: string): BuddyMessage | null {
@@ -163,19 +224,30 @@ function looseExtractBuddyMessage(text: string): BuddyMessage | null {
   const typeMatch = text.match(/"type"\s*:\s*"(chat|break)"/)
   if (!typeMatch) return null
 
-  const contentMatch = text.match(/"content"\s*:\s*"([\s\S]+)/)
-  if (!contentMatch) return null
+  const kind = typeMatch[1] as 'chat' | 'break'
 
-  let content = contentMatch[1]
-  const trimmedContent = content.trimEnd()
-  const structuralEnd = /"\s*\}\s*$/.exec(trimmedContent)
-  if (structuralEnd) {
-    content = trimmedContent.slice(0, structuralEnd.index)
-  }
+  const contentKeyMatch = text.match(/"content"\s*:\s*"/)
+  if (!contentKeyMatch || contentKeyMatch.index === undefined) return null
 
-  return typeMatch[1] === 'break'
+  const contentStart = contentKeyMatch.index + contentKeyMatch[0].length
+  const closingQuote = findClosingContentQuote(text)
+  const raw = closingQuote !== -1 && closingQuote > contentStart
+    ? text.slice(contentStart, closingQuote)
+    : text.slice(contentStart)
+  const content = unescapeJsonString(raw)
+
+  return kind === 'break'
     ? { kind: 'break', content }
     : { kind: 'message', text: content }
+}
+
+function unescapeJsonString(s: string): string {
+  return s
+    .replace(/\\n/g, '\n')
+    .replace(/\\t/g, '\t')
+    .replace(/\\r/g, '\r')
+    .replace(/\\\\/g, '\\')
+    .replace(/\\"/g, '"')
 }
 
 function extractClaudeOutput(rawEvents: string): string {

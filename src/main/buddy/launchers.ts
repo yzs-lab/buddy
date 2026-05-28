@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
 import { basename } from 'node:path'
+import { installHintFor } from './shell-path'
 
 export type LauncherCommandKind =
   | 'native_claude'
@@ -188,27 +189,55 @@ export async function runLauncher(input: {
   onStderr(line: string): void
 }): Promise<{ exitCode: number | null }> {
   const [command, ...prefixArgs] = splitCommand(input.command)
-  const child = spawn(command, [...prefixArgs, ...input.args], {
-    cwd: input.cwd,
-    env: { ...process.env, ...input.env },
-    stdio: ['pipe', 'pipe', 'pipe']
+  let child: ReturnType<typeof spawn>
+  try {
+    child = spawn(command, [...prefixArgs, ...input.args], {
+      cwd: input.cwd,
+      env: { ...process.env, ...input.env },
+      stdio: ['pipe', 'pipe', 'pipe']
+    })
+  } catch (error) {
+    throw commandNotFoundError(command, error)
+  }
+
+  const spawnError = await new Promise<Error | null>((resolve) => {
+    child.on('error', (err) => {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+        resolve(commandNotFoundError(command, err))
+      } else {
+        resolve(err)
+      }
+    })
+    child.on('spawn', () => resolve(null))
   })
 
-  child.stdout.setEncoding('utf8')
-  child.stderr.setEncoding('utf8')
-  child.stdout.on('data', (chunk: string) => {
+  if (spawnError) throw spawnError
+
+  child.stdout!.setEncoding('utf8')
+  child.stderr!.setEncoding('utf8')
+  child.stdout!.on('data', (chunk: string) => {
     for (const line of chunk.split(/\r?\n/).filter(Boolean)) input.onStdout(line)
   })
-  child.stderr.on('data', (chunk: string) => {
+  child.stderr!.on('data', (chunk: string) => {
     for (const line of chunk.split(/\r?\n/).filter(Boolean)) input.onStderr(line)
   })
 
-  child.stdin.end(input.stdinText ?? '')
+  child.stdin!.end(input.stdinText ?? '')
 
   const timeout = setTimeout(() => child.kill('SIGTERM'), input.timeoutMs)
   const [exitCode] = await once(child, 'exit') as [number | null]
   clearTimeout(timeout)
   return { exitCode }
+}
+
+function commandNotFoundError(command: string, cause: unknown): Error {
+  const hint = installHintFor(command)
+  const msg = hint
+    ? `Command '${command}' not found. Install with: ${hint}`
+    : `Command '${command}' not found in PATH. Please install it and try again.`
+  const err = new Error(msg)
+  Object.assign(err, { cause })
+  return err
 }
 
 function splitCommand(command: string): string[] {
