@@ -13,7 +13,7 @@ set -euo pipefail
 #   - Rosetta installed for x64 cross-build (softwareupdate --install-rosetta)
 #
 # Flow:
-#   build → verify → tag+push → upload to GitLab → create release → rsync deploy
+#   bump version → build → verify → commit+tag+push → upload to GitLab → create release → rsync deploy
 # =============================================================================
 
 VERSION="${1:?Usage: release.sh <version>  e.g. release.sh v1.2.0}"
@@ -32,13 +32,8 @@ RSYNC_PASS_FILE="${RSYNC_PASS_FILE:-$HOME/.rsyncd.pass}"
 RSYNC_DEST="buddyweb@10.185.10.105::buddyweb-releases/"
 PACKAGE_NAME="buddy-macos"
 
-# Get GitLab token from glab (no manual GITLAB_TOKEN needed)
-GITLAB_TOKEN="$(glab auth token)"
-
 # --- Derive GitLab info from remote ---
 REMOTE_URL="$(git remote get-url origin)"
-# SSH: ssh://git@host:port/group/project.git or git@host:group/project.git
-# HTTPS: https://host/group/project.git
 if [[ "$REMOTE_URL" == ssh://git@* ]]; then
   REST="${REMOTE_URL#ssh://git@}"
   GITLAB_HOST="${REST%%:*}"
@@ -66,15 +61,15 @@ echo "=== Buddy Release ${VERSION} ==="
 echo "GitLab: ${GITLAB_HOST} / ${PROJECT_PATH}"
 echo ""
 
-# --- 1. Verify clean state ---
-echo ">> Checking git state..."
-if ! git diff --quiet HEAD 2>/dev/null || ! git diff --quiet --cached 2>/dev/null; then
-  echo "Working tree has uncommitted changes. Commit or stash first." >&2; exit 1
+# --- 1. Bump version in package.json ---
+echo ">> Bumping version to ${PACKAGE_VERSION}..."
+CURRENT_VERSION="$(node -e "console.log(require('./package.json').version)")"
+if [ "$CURRENT_VERSION" = "$PACKAGE_VERSION" ]; then
+  echo "   Version already ${PACKAGE_VERSION} ✓"
+else
+  node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.version='${PACKAGE_VERSION}';fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
+  echo "   ${CURRENT_VERSION} → ${PACKAGE_VERSION} ✓"
 fi
-if git tag --list "$VERSION" | grep -q .; then
-  echo "Tag ${VERSION} already exists." >&2; exit 1
-fi
-echo "   Clean ✓"
 
 # --- 2. Build ---
 echo ">> Building..."
@@ -113,10 +108,13 @@ git archive --format=tar.gz --prefix="buddy-macos-${VERSION}/" HEAD \
 git archive --format=zip --prefix="buddy-macos-${VERSION}/" -o "release/buddy-macos-${VERSION}-source.zip" HEAD
 echo "   Source archives created ✓"
 
-# --- 6. Tag and push ---
+# --- 6. Commit version bump, tag and push ---
+echo ">> Committing version bump..."
+git add package.json
+git commit -m "chore: release ${VERSION}"
 echo ">> Pushing tag ${VERSION}..."
 git tag "$VERSION"
-git push origin "$VERSION"
+git push origin main "$VERSION"
 echo "   Tag pushed ✓"
 
 # --- 7. Upload to GitLab Package Registry ---
@@ -125,15 +123,10 @@ upload_file() {
   local basename
   basename="$(basename "$file")"
   echo "   Uploading ${basename}..."
-  local http_code
-  http_code="$(curl --silent --output /dev/null --write-out '%{http_code}' \
-    --header "PRIVATE-TOKEN: ${GITLAB_TOKEN}" \
-    --upload-file "$file" \
-    "${API_BASE}/projects/${PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${PACKAGE_VERSION}/${basename}")"
-  if [ "$http_code" -ge 300 ]; then
-    echo "   Upload failed (HTTP ${http_code}): ${basename}" >&2
-    exit 1
-  fi
+  local response
+  response="$(glab api --method PUT --input "$file" \
+    "/projects/${PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${PACKAGE_VERSION}/${basename}" 2>&1)" \
+    || { echo "   Upload failed: ${response}" >&2; exit 1; }
 }
 
 echo ">> Uploading to GitLab Package Registry..."
@@ -196,15 +189,11 @@ RELEASE_PAYLOAD="$(cat <<EOF
 EOF
 )"
 
-http_code="$(curl --silent --output /dev/null --write-out '%{http_code}' \
-  --header "PRIVATE-TOKEN: ${GITLAB_TOKEN}" \
-  --header "Content-Type: application/json" \
-  --data "$RELEASE_PAYLOAD" \
-  "${API_BASE}/projects/${PROJECT_ID}/releases")"
-if [ "$http_code" -ge 300 ]; then
-  echo "   Release creation failed (HTTP ${http_code})" >&2
-  exit 1
-fi
+TMP_PAYLOAD="$(mktemp)"
+echo "$RELEASE_PAYLOAD" > "$TMP_PAYLOAD"
+glab api --method POST --input "$TMP_PAYLOAD" "/projects/${PROJECT_ID}/releases" >/dev/null \
+  || { echo "   Release creation failed" >&2; rm -f "$TMP_PAYLOAD"; exit 1; }
+rm -f "$TMP_PAYLOAD"
 echo "   Release created ✓"
 
 # --- 9. Deploy to update server ---
