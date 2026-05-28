@@ -50,6 +50,34 @@ export function isTaskUnread(task: Task, selectedTaskId: string | null): boolean
   return updatedAt > lastRead
 }
 
+// --- Last selected task ---
+
+export function readLastSelectedTask(): { taskId: string; workspaceKey: string } | null {
+  try {
+    if (typeof window === 'undefined') return null
+    const saved = window.localStorage?.getItem('buddy.lastSelectedTask')
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      if (parsed.taskId) return { taskId: parsed.taskId, workspaceKey: parsed.workspaceKey || null }
+    }
+  } catch {}
+  return null
+}
+
+export function saveLastSelectedTask(taskId: string, workspaceKey: string) {
+  try {
+    if (typeof window === 'undefined') return
+    window.localStorage?.setItem('buddy.lastSelectedTask', JSON.stringify({ taskId, workspaceKey }))
+  } catch {}
+}
+
+export function clearLastSelectedTask() {
+  try {
+    if (typeof window === 'undefined') return
+    window.localStorage?.removeItem('buddy.lastSelectedTask')
+  } catch {}
+}
+
 export function projectNameForTask(task: Task, projectNames?: Record<string, string>): string {
   if (task.repo_root && projectNames?.[task.repo_root]) {
     return projectNames[task.repo_root]

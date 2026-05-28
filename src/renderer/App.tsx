@@ -13,7 +13,7 @@ import { StatusBar } from './components/StatusBar'
 import { SettingsContent, SettingsTab } from './components/SettingsContent'
 import { ACTOR_LABEL_KEY, Actor } from './lib/format'
 import { isTaskReadyToStart } from './lib/taskState'
-import { readStringArraySetting, visibleTasksForShortcuts, markTaskAsRead } from './lib/taskList'
+import { readStringArraySetting, visibleTasksForShortcuts, markTaskAsRead, readLastSelectedTask, saveLastSelectedTask, clearLastSelectedTask } from './lib/taskList'
 import type { GlobalSettings, InstructionQueueItem } from '../shared/types'
 import { defaultLauncherFor, normalizeGlobalSettings } from '../shared/defaults'
 
@@ -23,8 +23,8 @@ export default function App() {
   const [isStatusBarOpen, setIsStatusBarOpen] = useState(true)
   const [sidebarWidth, setSidebarWidth] = useState(240)
   const [statusBarWidth, setStatusBarWidth] = useState(280)
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
-  const [selectedWorkspaceKey, setSelectedWorkspaceKey] = useState<string | null>(null)
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(() => readLastSelectedTask()?.taskId ?? null)
+  const [selectedWorkspaceKey, setSelectedWorkspaceKey] = useState<string | null>(() => readLastSelectedTask()?.workspaceKey ?? null)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [pendingRepoRoot, setPendingRepoRoot] = useState<string | null>(null)
   const [view, setView] = useState<'chat' | 'settings'>('chat')
@@ -50,6 +50,19 @@ export default function App() {
   const { data: tasks = [], isLoading: isLoadingTasks, error: tasksError } = useTasks()
   const { data: taskDetail } = useTaskDetail(selectedTaskId, selectedWorkspaceKey ?? undefined)
 
+  // Auto-select: restore last selection or default to first task
+  useEffect(() => {
+    if (isLoadingTasks || tasks.length === 0) return
+    // If current selection still exists in tasks, keep it
+    if (selectedTaskId && tasks.some(t => t.task_id === selectedTaskId)) return
+    // Otherwise auto-select the first (most recently updated) task
+    const firstTask = tasks[0]
+    setSelectedTaskId(firstTask.task_id)
+    setSelectedWorkspaceKey(firstTask.workspace_key)
+    markTaskAsRead(firstTask.task_id)
+    saveLastSelectedTask(firstTask.task_id, firstTask.workspace_key)
+  }, [tasks, isLoadingTasks, selectedTaskId])
+
   const createTask = useCreateTask()
   const deleteTask = useDeleteTask()
   const sendMessage = useSendMessage()
@@ -71,6 +84,7 @@ export default function App() {
     setSelectedTaskId(taskId)
     setSelectedWorkspaceKey(workspaceKey)
     markTaskAsRead(taskId)
+    saveLastSelectedTask(taskId, workspaceKey)
   }, [])
 
   const handleDeleteTask = useCallback(async (taskId: string, workspaceKey: string) => {
@@ -80,6 +94,7 @@ export default function App() {
       if (selectedTaskId === taskId) {
         setSelectedTaskId(null)
         setSelectedWorkspaceKey(null)
+        clearLastSelectedTask()
       }
     } catch (error) {
       console.error('Failed to delete task:', error)
@@ -113,6 +128,7 @@ export default function App() {
     if (projectTasks.some(t => t.task_id === selectedTaskId)) {
       setSelectedTaskId(null)
       setSelectedWorkspaceKey(null)
+      clearLastSelectedTask()
     }
   }, [tasks, deleteTask, selectedTaskId])
 
@@ -136,6 +152,7 @@ export default function App() {
       setSelectedTaskId(result.task)
       setSelectedWorkspaceKey(result.workspace_key)
       markTaskAsRead(result.task)
+      saveLastSelectedTask(result.task, result.workspace_key)
       setShowCreateModal(false)
       setPendingRepoRoot(null)
       // Auto-start immediately if task has real text
@@ -313,6 +330,8 @@ export default function App() {
     setStatusBarWidth(prev => Math.max(200, Math.min(400, prev + delta)))
   }, [])
 
+  const hasAnyTasks = tasks.length > 0
+
   return (
     <div className="h-screen flex">
       {/* 左侧栏（通顶通底） */}
@@ -370,6 +389,7 @@ export default function App() {
               {/* 中间对话区域 */}
               <ChatArea
                 task={taskDetail ?? null}
+                hasAnyTasks={hasAnyTasks}
                 onSendMessage={handleSendMessage}
                 onStartTask={handleStartTask}
                 onInterrupt={handleInterrupt}
@@ -384,7 +404,7 @@ export default function App() {
 
               {/* 右侧状态栏 */}
               <StatusBar
-                isOpen={isStatusBarOpen}
+                isOpen={isStatusBarOpen && (selectedTaskId !== null || hasAnyTasks)}
                 width={statusBarWidth}
                 taskState={taskDetail?.state ?? null}
                 taskSettings={taskDetail?.settings ?? null}

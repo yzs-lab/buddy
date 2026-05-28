@@ -191,6 +191,8 @@ const en = {
   // ChatArea
   'chat.empty.title': 'Select or create a task',
   'chat.empty.desc': 'Pick a task from the sidebar, or create a new one to start.',
+  'chat.onboarding.title': 'Welcome to Buddy',
+  'chat.onboarding.desc': 'Create your first task to start a collaborative coding journey with AI agents.',
   'chat.created.title': 'Task created',
   'chat.created.desc': 'Click "Start" below to let AI begin.',
   'chat.taskBrief': 'Task brief',
@@ -474,6 +476,8 @@ const zhCN: typeof en = {
 
   'chat.empty.title': '选择或创建一个任务',
   'chat.empty.desc': '在左侧栏选择任务，或创建新任务开始',
+  'chat.onboarding.title': '欢迎使用 Buddy',
+  'chat.onboarding.desc': '创建你的第一个任务，开始 AI 协作编程之旅。',
   'chat.created.title': '任务已创建',
   'chat.created.desc': '点击下方"开始"让 AI 开始工作',
   'chat.taskBrief': '任务说明',
@@ -749,6 +753,8 @@ const zhTW: typeof en = {
 
   'chat.empty.title': '選擇或建立任務',
   'chat.empty.desc': '在左側選擇任務，或建立新任務開始',
+  'chat.onboarding.title': '歡迎使用 Buddy',
+  'chat.onboarding.desc': '建立你的第一個任務，開始 AI 協作程式設計之旅。',
   'chat.created.title': '任務已建立',
   'chat.created.desc': '點擊下方「開始」讓 AI 開始工作',
   'chat.taskBrief': '任務說明',

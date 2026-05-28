@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ListOrdered, CornerDownRight, Trash2 } from 'lucide-react'
+import { ListOrdered, CornerDownRight, Trash2, Sparkles } from 'lucide-react'
 import { TaskDetail, InstructionQueueItem } from '../../shared/types'
 import { MessageBubble } from './MessageBubble'
 import { RunningStatusMessage } from './RunningStatusMessage'
@@ -12,6 +12,7 @@ import { renderMarkdown } from '../lib/markdown'
 
 interface ChatAreaProps {
   task: TaskDetail | null
+  hasAnyTasks: boolean
   onSendMessage: (message: string, actor?: string) => void
   onStartTask: (actor?: string) => void
   onInterrupt: () => void
@@ -24,7 +25,7 @@ interface ChatAreaProps {
   onDraftChange: (value: string) => void
 }
 
-export function ChatArea({ task, onSendMessage, onStartTask, onInterrupt, onEnqueueInstruction, onInterruptAndInsert, onDequeueInstruction, onEditInstruction, onClearInstructionQueue, draft, onDraftChange }: ChatAreaProps) {
+export function ChatArea({ task, hasAnyTasks, onSendMessage, onStartTask, onInterrupt, onEnqueueInstruction, onInterruptAndInsert, onDequeueInstruction, onEditInstruction, onClearInstructionQueue, draft, onDraftChange }: ChatAreaProps) {
   const t = useT()
   const transcriptRef = useRef<HTMLDivElement>(null)
   const [showScrollBtn, setShowScrollBtn] = useState(false)
@@ -64,6 +65,11 @@ export function ChatArea({ task, onSendMessage, onStartTask, onInterrupt, onEnqu
     }
   }, [task?.transcript, task?.state?.status, task?.state?.active_run?.actor])
 
+  useEffect(() => {
+    userScrolledUp.current = false
+    setShowScrollBtn(false)
+  }, [task?.task_id])
+
   const isRunning = task?.state?.status?.startsWith('RUNNING_') ?? false
   const isReady = isTaskReadyToStart(task?.state)
   const hasTranscript = (task?.transcript?.length ?? 0) > 0
@@ -74,12 +80,22 @@ export function ChatArea({ task, onSendMessage, onStartTask, onInterrupt, onEnqu
     <div className="flex-1 flex flex-col bg-bg-elevated min-w-0">
       <div ref={transcriptRef} className="flex-1 overflow-y-auto px-6 py-4">
         {!task ? (
-          <div className="flex items-center justify-center h-full min-h-[60vh]">
-            <div className="text-center text-fg-muted">
-              <div className="text-lg font-medium mb-2">{t('chat.empty.title')}</div>
-              <div className="text-sm">{t('chat.empty.desc')}</div>
+          !hasAnyTasks ? (
+            <div className="flex items-center justify-center h-full min-h-[60vh]">
+              <div className="text-center text-fg-muted max-w-xs">
+                <Sparkles size={36} strokeWidth={1.25} className="mx-auto mb-4 text-fg-muted/60" />
+                <div className="text-lg font-medium mb-2">{t('chat.onboarding.title')}</div>
+                <div className="text-sm leading-relaxed">{t('chat.onboarding.desc')}</div>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="flex items-center justify-center h-full min-h-[60vh]">
+              <div className="text-center text-fg-muted">
+                <div className="text-lg font-medium mb-2">{t('chat.empty.title')}</div>
+                <div className="text-sm">{t('chat.empty.desc')}</div>
+              </div>
+            </div>
+          )
         ) : (
           <>
             {showTaskBrief && (
