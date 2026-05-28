@@ -1,0 +1,101 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+## [1.0.0] - 2026-05-28
+
+### Added
+
+- 原生 Buddy Core：TypeScript 重写 buddy-python 的双 Actor 轮转、break 双确认、失败暂停、session 复用
+- 支持 4 种 AI Actor：Claude Code、Codex、OpenCode、Kimi Code（含变体检测）
+- 任务状态机：READY → RUNNING → PAUSED/DONE/FAILED 完整生命周期
+- 指令队列：运行期间可排队发送指令，轮次结束后连续执行
+- Git 集成：本地化 conventional commit 消息自动生成、变更文件查看、提交与推送
+- 消息附件：支持在对话中附加文件内容
+- 新手引导：首次使用时的引导提示
+- 记住上次选中的任务
+- 任务未读状态指示
+- 三栏 UI 布局：Sidebar + Chat + Right Panel
+- 23 套预设主题，CSS 自定义属性驱动，支持自定义颜色选择器
+- 国际化：中文简体 / 中文繁体 / 英文，CJK 自动检测
+- 快捷键系统：可配置发送快捷键、Cmd+1/2/3/4 标签页切换、Cmd+Enter 发送
+- macOS 原生菜单栏国际化
+- 与 buddy-python 数据目录兼容（`~/Library/Application Support/buddy/`）
+- 应用崩溃/重启后任务状态完整恢复
+- GitLab CI/CD 流水线配置
+- DMG 打包（arm64 / x64 分架构构建）
+
+### Changed
+
+- 移除倒计时机制，Actor 完成后直接启动下一轮
+- 从 HTTP 代理架构迁移到原生 IPC 架构（移除 Python 运行时依赖）
+- 全局设置中管理 max_rounds 和任务相关参数
+- Actor 错误消息包含所有输出来源
+- 默认 launcher 命令设为 actor 名称而非空字符串
+- 侧边栏项目可折叠
+- 紧凑的弹窗布局，可折叠的侧边栏事件
+- 简化侧边栏行和状态栏布局
+
+### Fixed
+
+- 修复 macOS PATH 环境变量问题，Actor 子进程可正确找到 CLI 工具
+- 修复 JSON 流式输出解析增强
+- 修复 git status 路径解析截断首字符
+- 防御性处理 gitStatus.files 可能为 undefined
+- 统一侧边栏与弹窗的文件变更汇总计算
+- 修复提交弹窗 +/- 列对齐和汇总数据不一致
+- 修复弹窗 Escape 关闭与远程仓库选择记忆
+- 目录选择对话框支持创建新目录并消除重复配置
+- CommitModal 生成完成后自动聚焦提交信息输入框
+- 统一下拉菜单样式
+- 与 buddy-python 对齐 workspace key 哈希算法
+- 允许 READY 和 FAILED 状态的任务重新启动
+- 加载旧版 Buddy 数据兼容
+- 保留原生 CLI 设置不被覆盖
+- 移除已完成的 actor 文本从事件摘要中隐藏
+- 修复侧边栏任务行 hover 对齐
+
+---
+
+## 早期开发阶段 - 2026-05-22 ~ 2026-05-25
+
+### Added
+
+- Electron 主进程与窗口管理器
+- React 基础结构 + Tailwind CSS
+- API 客户端与 React hooks
+- 标题栏、侧边栏、状态栏、聊天区组件
+- 组件集成到主应用
+- E2E 测试基础框架
+- 构建与打包配置
+- MVP 设计与实施计划
+- 可调整大小的侧边栏和状态栏、窗口拖拽
+- 加载与错误状态
+- 健康检查与错误处理
+- Buddy session 工作流
+- 侧边栏状态指示器
+- 项目管理、自动开始倒计时、错误文本解码
+- 任务置顶功能
+- i18n (zh-CN/zh-TW/en) 与可配置发送快捷键
+
+### Changed
+
+- 从 HTTP API 代理迁移到 Vite 代理解决 CORS
+
+### Fixed
+
+- 侧边栏任务置顶时移除水平滚动条
+- 侧边栏切换图标与状态栏样式统一
+
+---
+
+## 设计与规划 - 2026-05-22
+
+### Added
+
+- 项目需求文档 (REQUIREMENTS.md)
+- 项目结构初始化
+
+[1.0.0]: https://gitlab.weibo.cn/ailab/buddy-macos/-/tags/v1.0.0

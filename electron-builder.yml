@@ -28,3 +28,6 @@ dmg:
       y: 220
       type: link
       path: /Applications
+publish:
+  provider: generic
+  url: http://buddy.intra.weibo.cn/releases

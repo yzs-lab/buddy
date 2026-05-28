@@ -329,6 +329,17 @@ const en = {
   'shortcuts.nextTask': 'Next Task',
   'shortcuts.prevTask': 'Previous Task',
   'shortcuts.escape': 'Close Dialog / Back to Chat',
+
+  // Updater
+  'updater.available': 'Update available: v{version}',
+  'updater.mandatoryHint': 'This update is required and will be installed automatically.',
+  'updater.downloadHint': 'A new version is available. Download and install now?',
+  'updater.download': 'Download Update',
+  'updater.downloading': 'Downloading… {percent}%',
+  'updater.downloaded': 'v{version} ready to install',
+  'updater.restartHint': 'Restart the app to complete the update.',
+  'updater.restart': 'Restart to Update',
+  'updater.error': 'Update failed',
 }
 
 // Simplified Chinese — preserves the original wording in the codebase.
@@ -611,6 +622,17 @@ const zhCN: typeof en = {
   'shortcuts.nextTask': '下一个任务',
   'shortcuts.prevTask': '上一个任务',
   'shortcuts.escape': '关闭对话框 / 返回聊天',
+
+  // Updater
+  'updater.available': '发现新版本：v{version}',
+  'updater.mandatoryHint': '此更新为必须更新，将自动安装。',
+  'updater.downloadHint': '有新版本可用，是否立即下载安装？',
+  'updater.download': '下载更新',
+  'updater.downloading': '下载中… {percent}%',
+  'updater.downloaded': 'v{version} 已就绪',
+  'updater.restartHint': '重启应用以完成更新。',
+  'updater.restart': '重启并更新',
+  'updater.error': '更新失败',
 }
 
 // Traditional Chinese
@@ -895,6 +917,17 @@ const zhTW: typeof en = {
   'shortcuts.nextTask': '下一個任務',
   'shortcuts.prevTask': '上一個任務',
   'shortcuts.escape': '關閉對話框 / 返回聊天',
+
+  // Updater
+  'updater.available': '發現新版本：v{version}',
+  'updater.mandatoryHint': '此更新為必須更新，將自動安裝。',
+  'updater.downloadHint': '有新版本可用，是否立即下載安裝？',
+  'updater.download': '下載更新',
+  'updater.downloading': '下載中… {percent}%',
+  'updater.downloaded': 'v{version} 已就緒',
+  'updater.restartHint': '重啟應用以完成更新。',
+  'updater.restart': '重啟並更新',
+  'updater.error': '更新失敗',
 }
 
 const dictionaries: Record<Language, typeof en> = {

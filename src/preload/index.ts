@@ -26,7 +26,18 @@ const api = {
   saveAttachmentBuffer: (taskId: string, workspaceKey: string, name: string, bufferBase64: string): Promise<string> =>
     ipcRenderer.invoke('attachment:saveBuffer', taskId, workspaceKey, name, bufferBase64),
   readFileAsDataURL: (filePath: string, mimeType: string): Promise<string> =>
-    ipcRenderer.invoke('attachment:readFileAsDataURL', filePath, mimeType)
+    ipcRenderer.invoke('attachment:readFileAsDataURL', filePath, mimeType),
+  checkForUpdates: (): void => {
+    ipcRenderer.invoke('updater:check')
+  },
+  installUpdate: (): void => {
+    ipcRenderer.invoke('updater:install')
+  },
+  onUpdaterEvent: (callback: (event: unknown) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: unknown) => callback(payload)
+    ipcRenderer.on('updater:event', handler)
+    return () => { ipcRenderer.removeListener('updater:event', handler) }
+  }
 }
 
 const buddy = createBuddyPreloadApi(ipcRenderer)

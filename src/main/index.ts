@@ -1,3 +1,6 @@
+// Must be set before electron-updater is imported (via updater.ts)
+process.env.ELECTRON_UPDATER_ALLOW_HTTP = '1'
+
 import { app, BrowserWindow, ipcMain, dialog, shell, clipboard } from 'electron'
 import { WindowManager } from './window-manager'
 import { registerBuddyHandlers } from './ipc/buddy-handlers'
@@ -5,6 +8,7 @@ import { BuddyCoreService } from './buddy/service'
 import { BuddyEventBus } from './buddy/events'
 import { fixShellPath } from './buddy/shell-path'
 import { setupMenu, updateMenuLanguage } from './menu'
+import { initUpdater, checkForUpdates, quitAndInstall } from './updater'
 import { mkdir, writeFile, stat, readFile, realpath } from 'node:fs/promises'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
@@ -26,7 +30,18 @@ app.whenReady().then(async () => {
   await buddyService.recoverInterruptedRuns()
   windowManager.createWindow()
   const mainWindow = windowManager.getMainWindow()
-  if (mainWindow) setupMenu(mainWindow)
+  if (mainWindow) {
+    setupMenu(mainWindow)
+    initUpdater(mainWindow)
+  }
+
+  ipcMain.handle('updater:check', () => {
+    checkForUpdates()
+  })
+
+  ipcMain.handle('updater:install', () => {
+    quitAndInstall()
+  })
 
   ipcMain.handle('dialog:selectDirectory', async (_event, defaultPath?: string) => {
     const win = windowManager.getMainWindow()

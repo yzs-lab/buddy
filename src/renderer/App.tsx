@@ -11,6 +11,7 @@ import { Sidebar } from './components/Sidebar'
 import { ChatArea } from './components/ChatArea'
 import { StatusBar } from './components/StatusBar'
 import { SettingsContent, SettingsTab } from './components/SettingsContent'
+import { UpdateNotification } from './components/UpdateNotification'
 import { ACTOR_LABEL_KEY, Actor } from './lib/format'
 import { isTaskReadyToStart } from './lib/taskState'
 import { readStringArraySetting, visibleTasksForShortcuts, markTaskAsRead, readLastSelectedTask, saveLastSelectedTask, clearLastSelectedTask } from './lib/taskList'
@@ -435,11 +436,11 @@ export default function App() {
       } else if (action === 'toggleStatusBar') {
         setIsStatusBarOpen(prev => !prev)
       } else if (action === 'openDocumentation') {
-        window.open('https://github.com/davidliudev/buddy/tree/main/docs', '_blank')
+        window.open('https://gitlab.weibo.cn/ailab/buddy-macos/-/tree/main/docs', '_blank')
       } else if (action === 'openWhatsNew') {
-        window.open('https://github.com/davidliudev/buddy/releases', '_blank')
+        window.open('https://buddy.intra.weibo.cn/releases/', '_blank')
       } else if (action === 'sendFeedback') {
-        window.open('https://github.com/davidliudev/buddy/issues/new', '_blank')
+        window.open('https://gitlab.weibo.cn/ailab/buddy-macos/-/issues/new', '_blank')
       } else if (action === 'showKeyboardShortcuts') {
         setView('settings')
         setSettingsTab('keyboard')
@@ -600,6 +601,9 @@ export default function App() {
           t={t}
         />
       )}
+
+      {/* 更新通知 */}
+      <UpdateNotification />
     </div>
   )
 }

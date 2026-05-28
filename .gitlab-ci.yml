@@ -3,6 +3,7 @@ stages:
   - build
   - package
   - release
+  - deploy
 
 variables:
   ELECTRON_CACHE: $CI_PROJECT_DIR/.cache/electron
@@ -182,3 +183,24 @@ create-release:
         - name: "Source (.zip)"
           url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/buddy-macos/${CI_COMMIT_TAG#v}/buddy-macos-${CI_COMMIT_TAG}-source.zip"
           link_type: package
+
+# -------------------------------------------------------
+# Deploy: rsync to internal update server
+# -------------------------------------------------------
+deploy:updates:
+  stage: deploy
+  tags: [macos]
+  rules: *rule_release
+  needs:
+    - job: package:macos
+      artifacts: true
+  before_script:
+    - echo "$RSYNC_PASS" > /tmp/rsyncd.pass && chmod 600 /tmp/rsyncd.pass
+  script:
+    - PACKAGE_VERSION="${CI_COMMIT_TAG#v}"
+    # Upload ZIPs first (arm64 + x64)
+    - find release -maxdepth 1 -name '*.zip' -exec rsync -avz --password-file=/tmp/rsyncd.pass {} buddyweb@10.185.10.105::buddyweb-releases/ \;
+    # Upload latest-mac.yml last (atomic commit point)
+    - find release -maxdepth 1 -name 'latest-mac.yml' -exec rsync -avz --password-file=/tmp/rsyncd.pass {} buddyweb@10.185.10.105::buddyweb-releases/ \;
+  after_script:
+    - rm -f /tmp/rsyncd.pass
