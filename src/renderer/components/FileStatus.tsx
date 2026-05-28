@@ -56,9 +56,9 @@ export function FileStatus({ gitStatus, isLoading, repoRoot, onOpenCommit }: Fil
     )
   }
 
-  const totalInsertions = (gitStatus.diff?.insertions ?? 0) + (gitStatus.staged?.insertions ?? 0)
-  const totalDeletions = (gitStatus.diff?.deletions ?? 0) + (gitStatus.staged?.deletions ?? 0)
-  const totalFiles = (gitStatus.diff?.filesChanged ?? 0) + (gitStatus.staged?.filesChanged ?? 0) + gitStatus.untracked
+  const totalInsertions = gitStatus.files.reduce((s, f) => s + f.insertions, 0)
+  const totalDeletions = gitStatus.files.reduce((s, f) => s + f.deletions, 0)
+  const totalFiles = gitStatus.files.length
   const hasChanges = totalFiles > 0
 
   return (
