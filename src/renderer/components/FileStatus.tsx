@@ -307,10 +307,10 @@ export function CommitModal({ gitStatus, repoRoot, onClose, onSuccess, onError }
                         <td className="px-3 py-1.5 font-mono text-fg-secondary truncate max-w-[320px]" title={f.path}>
                           {f.path}
                         </td>
-                        <td className="px-2 py-1.5 text-right font-mono text-success-fg">
+                        <td className="px-2 py-1.5 text-right font-mono text-success-fg whitespace-nowrap">
                           {f.insertions > 0 ? `+${f.insertions}` : ''}
                         </td>
-                        <td className="px-2 py-1.5 text-right font-mono text-danger">
+                        <td className="px-2 py-1.5 text-right font-mono text-danger whitespace-nowrap">
                           {f.deletions > 0 ? `-${f.deletions}` : ''}
                         </td>
                       </tr>
