@@ -6,6 +6,7 @@ import { useT, type TFunction } from '../hooks/useI18n'
 import { useLanguage } from '../hooks/useI18n'
 import { api } from '../lib/api'
 import { formatBinding, loadBindings } from '../lib/keyboard'
+import { useQueryClient } from '@tanstack/react-query'
 
 interface FileStatusProps {
   gitStatus: GitStatusResult | null | undefined
@@ -121,8 +122,10 @@ interface CommitModalProps {
 export function CommitModal({ gitStatus, repoRoot, onClose, onSuccess, onError }: CommitModalProps) {
   const t = useT()
   const lang = useLanguage()
+  const queryClient = useQueryClient()
   const [message, setMessage] = useState('')
   const [isGenerating, setIsGenerating] = useState(true)
+  const [generateFailed, setGenerateFailed] = useState(false)
   const [isStaging, setIsStaging] = useState(false)
   const [isCommitting, setIsCommitting] = useState(false)
   const [selectedRemote, setSelectedRemote] = useState<string>(() => {
@@ -171,11 +174,16 @@ export function CommitModal({ gitStatus, repoRoot, onClose, onSuccess, onError }
 
   const handleGenerate = useCallback(async () => {
     setIsGenerating(true)
+    setGenerateFailed(false)
     try {
       const result = await api.generateCommitMessage(repoRoot, undefined, lang)
-      if (result) setMessage(result)
+      if (result) {
+        setMessage(result)
+      } else {
+        setGenerateFailed(true)
+      }
     } catch {
-      // fallback
+      setGenerateFailed(true)
     } finally {
       setIsGenerating(false)
     }
@@ -196,6 +204,7 @@ export function CommitModal({ gitStatus, repoRoot, onClose, onSuccess, onError }
     if (!message.trim()) return
     setIsCommitting(true)
     try {
+      await queryClient.cancelQueries({ queryKey: ['gitStatus'] })
       if (hasUnstaged) {
         await stageAll.mutateAsync(repoRoot)
       }
@@ -214,7 +223,7 @@ export function CommitModal({ gitStatus, repoRoot, onClose, onSuccess, onError }
     } finally {
       setIsCommitting(false)
     }
-  }, [message, repoRoot, selectedRemote, shouldPush, hasUnstaged, stageAll, commitAndPush, onSuccess, onError, t])
+  }, [message, repoRoot, selectedRemote, shouldPush, hasUnstaged, stageAll, commitAndPush, onSuccess, onError, t, queryClient])
 
   // Persist last-used remote for this repo
   useEffect(() => {
@@ -376,7 +385,7 @@ export function CommitModal({ gitStatus, repoRoot, onClose, onSuccess, onError }
                 }
               }}
               rows={6}
-              placeholder={isGenerating ? t('git.generating') : t('git.commitMessagePlaceholder')}
+              placeholder={isGenerating ? t('git.generating') : generateFailed ? t('git.generateFailed') : t('git.commitMessagePlaceholder')}
               disabled={isGenerating}
               className={`w-full px-3 py-1.5 border border-border rounded-lg focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent bg-bg font-mono text-xs resize-none ${isGenerating ? 'opacity-60' : ''}`}
             />

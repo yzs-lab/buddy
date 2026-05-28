@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { FolderOpen } from 'lucide-react'
 import { useHealthCheck, useBootstrap, useTasks, useTaskDetail, useCreateTask, useSendMessage, useStartTask, useInterrupt, useDeleteTask, useEnqueueInstruction, useDequeueInstruction, useClearInstructionQueue, useInterruptAndInsert } from './hooks/useBuddy'
 import { useTheme } from './hooks/useTheme'
@@ -25,6 +25,8 @@ export default function App() {
   const [statusBarWidth, setStatusBarWidth] = useState(280)
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(() => readLastSelectedTask()?.taskId ?? null)
   const [selectedWorkspaceKey, setSelectedWorkspaceKey] = useState<string | null>(() => readLastSelectedTask()?.workspaceKey ?? null)
+  // Track just-created task to prevent auto-select from overriding its selection
+  const justCreatedTaskId = useRef<string | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [pendingRepoRoot, setPendingRepoRoot] = useState<string | null>(null)
   const [view, setView] = useState<'chat' | 'settings'>('chat')
@@ -55,7 +57,15 @@ export default function App() {
   useEffect(() => {
     if (isLoadingTasks || tasks.length === 0) return
     // If current selection still exists in tasks, keep it
-    if (selectedTaskId && tasks.some(t => t.task_id === selectedTaskId)) return
+    if (selectedTaskId && tasks.some(t => t.task_id === selectedTaskId)) {
+      // Clear the ref once the just-created task appears in the list
+      if (justCreatedTaskId.current === selectedTaskId) {
+        justCreatedTaskId.current = null
+      }
+      return
+    }
+    // Skip auto-select if we just created a task that hasn't appeared in the list yet
+    if (justCreatedTaskId.current) return
     // Otherwise auto-select the first (most recently updated) task
     const firstTask = tasks[0]
     setSelectedTaskId(firstTask.task_id)
@@ -159,6 +169,7 @@ export default function App() {
       }
       setSelectedTaskId(result.task)
       setSelectedWorkspaceKey(result.workspace_key)
+      justCreatedTaskId.current = result.task
       markTaskAsRead(result.task)
       saveLastSelectedTask(result.task, result.workspace_key)
       setShowCreateModal(false)
@@ -333,13 +344,44 @@ export default function App() {
     })
   }, [selectedTaskId, selectedWorkspaceKey, interruptAndInsert])
 
-  const handleEditInstruction = useCallback((item: { id: string; content: string }) => {
+  const handleEditInstruction = useCallback(async (item: InstructionQueueItem) => {
     if (!selectedTaskId || !selectedWorkspaceKey) return
-    // Move content back to input and remove from queue
+    // Strip [Attachments] block from content before putting it in draft
+    const cleanedContent = item.content.replace(/\n*\[Attachments\]\n(?:- .*\n?)+/g, '').trim()
     setDrafts(prev => ({
       ...prev,
-      [selectedTaskId]: prev[selectedTaskId] ? `${prev[selectedTaskId]}\n${item.content}` : item.content
+      [selectedTaskId]: prev[selectedTaskId] ? `${prev[selectedTaskId]}\n${cleanedContent}` : cleanedContent
     }))
+
+    // Restore attachments to Composer
+    if (item.attachments && item.attachments.length > 0) {
+      const restored: Attachment[] = []
+      for (const meta of item.attachments) {
+        const isImage = meta.mimeType.startsWith('image/')
+        let previewUrl: string | undefined
+        if (isImage) {
+          try {
+            previewUrl = await window.api.readFileAsDataURL(meta.path, meta.mimeType)
+          } catch {
+            // Fall back to no preview
+          }
+        }
+        restored.push({
+          id: Math.random().toString(36).slice(2, 10) + Date.now().toString(36),
+          name: meta.name,
+          category: isImage ? 'image' : 'file',
+          mimeType: meta.mimeType,
+          size: meta.size,
+          filePath: meta.path,
+          previewUrl,
+        })
+      }
+      setTaskAttachments(prev => ({
+        ...prev,
+        [selectedTaskId]: [...(prev[selectedTaskId] ?? []), ...restored]
+      }))
+    }
+
     dequeueInstruction.mutate({
       taskId: selectedTaskId,
       workspaceKey: selectedWorkspaceKey,

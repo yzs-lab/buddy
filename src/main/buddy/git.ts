@@ -1,22 +1,45 @@
 import { spawn } from 'node:child_process'
+import { existsSync, statSync, unlinkSync } from 'node:fs'
+import { join } from 'node:path'
 import { once } from 'node:events'
 import type { GitDiffStats, GitFileStatus, GitFileStatusCode, GitRemote, GitStatusResult } from '../../shared/types'
 
 export type { GitDiffStats, GitFileStatus, GitFileStatusCode, GitRemote, GitStatusResult }
 
-function execGit(args: string[], cwd: string): Promise<string> {
+function removeStaleIndexLock(cwd: string, maxAgeMs = 10_000): void {
+  const lockPath = join(cwd, '.git', 'index.lock')
+  try {
+    if (!existsSync(lockPath)) return
+    const age = Date.now() - statSync(lockPath).mtimeMs
+    if (age > maxAgeMs) {
+      unlinkSync(lockPath)
+    }
+  } catch {
+    // Lock file might have been removed between check and delete
+  }
+}
+
+function execGit(args: string[], cwd: string, retries = 1): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn('git', args, { cwd, stdio: ['pipe', 'pipe', 'pipe'] })
     const chunks: Buffer[] = []
     const errChunks: Buffer[] = []
     child.stdout.on('data', (c: Buffer) => chunks.push(c))
     child.stderr.on('data', (c: Buffer) => errChunks.push(c))
-    once(child, 'exit').then((args: unknown[]) => {
-      const code = args[0] as number | null
+    once(child, 'exit').then((exitArgs: unknown[]) => {
+      const code = exitArgs[0] as number | null
       const stdout = Buffer.concat(chunks).toString('utf8').trim()
       if (code !== 0) {
         const stderr = Buffer.concat(errChunks).toString('utf8').trim()
-        reject(new Error(stderr || `git ${args.join(' ')} exited with ${code}`))
+        const errMsg = stderr || `git ${args.join(' ')} exited with ${code}`
+        if (retries > 0 && errMsg.includes('index.lock')) {
+          removeStaleIndexLock(cwd)
+          setTimeout(() => {
+            execGit(args, cwd, retries - 1).then(resolve).catch(reject)
+          }, 500)
+        } else {
+          reject(new Error(errMsg))
+        }
       } else {
         resolve(stdout)
       }
@@ -162,6 +185,7 @@ export async function getGitStatus(cwd: string): Promise<GitStatusResult> {
 }
 
 export async function gitStageAll(cwd: string): Promise<void> {
+  removeStaleIndexLock(cwd)
   await execGit(['add', '-A'], cwd)
 }
 
@@ -171,6 +195,7 @@ export async function gitCommitAndPush(
   remote: string,
   push: boolean = true
 ): Promise<{ commitHash: string }> {
+  removeStaleIndexLock(cwd)
   await execGit(['commit', '-m', message], cwd)
   const commitHash = await execGit(['rev-parse', '--short', 'HEAD'], cwd)
   if (push) {
@@ -220,15 +245,23 @@ ${langInstruction}
 ${diffSummary}`
 
   return new Promise((resolve) => {
-    const child = spawn(command, ['-p', '--output-format', 'text', '--input-format', 'text'], {
-      cwd,
-      env: { ...process.env },
-      stdio: ['pipe', 'pipe', 'pipe']
-    })
+    let child: ReturnType<typeof spawn>
+    try {
+      child = spawn(command, ['-p', '--output-format', 'text', '--input-format', 'text'], {
+        cwd,
+        env: { ...process.env },
+        stdio: ['pipe', 'pipe', 'pipe']
+      })
+    } catch {
+      resolve('')
+      return
+    }
 
     const chunks: Buffer[] = []
-    child.stdout.on('data', (c: Buffer) => chunks.push(c))
-    child.stdin.end(prompt)
+    const errChunks: Buffer[] = []
+    child.stdout!.on('data', (c: Buffer) => chunks.push(c))
+    child.stderr!.on('data', (c: Buffer) => errChunks.push(c))
+    child.stdin!.end(prompt)
 
     const timeout = setTimeout(() => {
       child.kill('SIGTERM')
@@ -240,6 +273,11 @@ ${diffSummary}`
       const text = Buffer.concat(chunks).toString('utf8').trim()
       resolve(text || '')
     }).catch(() => {
+      clearTimeout(timeout)
+      resolve('')
+    })
+
+    child.on('error', () => {
       clearTimeout(timeout)
       resolve('')
     })

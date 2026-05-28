@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { MoreHorizontal, Pencil, Eraser } from 'lucide-react'
+import { MoreHorizontal, Pencil, Eraser, Paperclip } from 'lucide-react'
 import { InstructionQueueItem } from '../../shared/types'
 import { useT } from '../hooks/useI18n'
 
@@ -72,9 +72,18 @@ export function InstructionQueue({ items, onInterruptAndInsert, onRemove, onEdit
 
   return (
     <div className="px-8 pb-1 space-y-0.5">
-      {items.map((item) => (
+      {items.map((item) => {
+        const cleanedContent = item.content.replace(/\n*\[Attachments\]\n(?:- .*\n?)+/g, '').trim()
+        const attCount = item.attachments?.length ?? 0
+        return (
         <div key={item.id} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-bg-elevated border border-border text-xs group">
-          <span className="flex-1 truncate text-fg-secondary">{item.content}</span>
+          <span className="flex-1 truncate text-fg-secondary">{cleanedContent}</span>
+          {attCount > 0 && (
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-bg-subtle text-fg-muted text-[10px] shrink-0">
+              <Paperclip size={10} />
+              {attCount}
+            </span>
+          )}
           <div className="flex items-center gap-1.5 shrink-0 opacity-60 group-hover:opacity-100 transition-opacity">
             <button
               onClick={() => onInterruptAndInsert(item.id)}
@@ -96,7 +105,7 @@ export function InstructionQueue({ items, onInterruptAndInsert, onRemove, onEdit
             />
           </div>
         </div>
-      ))}
+      )})}
     </div>
   )
 }

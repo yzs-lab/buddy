@@ -224,6 +224,9 @@ export function useGitStageAll() {
 
   return useMutation({
     mutationFn: (repoRoot: string) => api.gitStageAll(repoRoot),
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ['gitStatus'] })
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['gitStatus'] })
     }
@@ -236,6 +239,9 @@ export function useGitCommitAndPush() {
   return useMutation({
     mutationFn: ({ repoRoot, message, remote, push }: { repoRoot: string; message: string; remote: string; push?: boolean }) =>
       api.gitCommitAndPush(repoRoot, message, remote, push),
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ['gitStatus'] })
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['gitStatus'] })
     }
