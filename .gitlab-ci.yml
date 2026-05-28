@@ -163,7 +163,7 @@ create-release:
   rules: *rule_release
   needs:
     - job: upload:artifacts
-      artifacts: false
+      artifacts: true
   script:
     - echo "Creating release for $CI_COMMIT_TAG"
   release:
