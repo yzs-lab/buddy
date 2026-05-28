@@ -150,54 +150,22 @@ echo "   Upload complete ✓"
 
 # --- 8. Create GitLab Release ---
 echo ">> Creating GitLab Release..."
-RELEASE_PAYLOAD="$(cat <<EOF
-{
-  "tag_name": "${VERSION}",
-  "name": "Buddy ${VERSION}",
-  "description": "Release ${VERSION}",
-  "assets": {
-    "links": [
-      {
-        "name": "macOS DMG (arm64)",
-        "url": "${API_BASE}/projects/${PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${PACKAGE_VERSION}/Buddy-${PACKAGE_VERSION}-arm64.dmg",
-        "link_type": "package"
-      },
-      {
-        "name": "macOS DMG (x64)",
-        "url": "${API_BASE}/projects/${PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${PACKAGE_VERSION}/Buddy-${PACKAGE_VERSION}.dmg",
-        "link_type": "package"
-      },
-      {
-        "name": "macOS ZIP (arm64)",
-        "url": "${API_BASE}/projects/${PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${PACKAGE_VERSION}/Buddy-${PACKAGE_VERSION}-arm64-mac.zip",
-        "link_type": "package"
-      },
-      {
-        "name": "macOS ZIP (x64)",
-        "url": "${API_BASE}/projects/${PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${PACKAGE_VERSION}/Buddy-${PACKAGE_VERSION}-mac.zip",
-        "link_type": "package"
-      },
-      {
-        "name": "Source (.tar.gz)",
-        "url": "${API_BASE}/projects/${PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${PACKAGE_VERSION}/buddy-macos-${VERSION}-source.tar.gz",
-        "link_type": "package"
-      },
-      {
-        "name": "Source (.zip)",
-        "url": "${API_BASE}/projects/${PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${PACKAGE_VERSION}/buddy-macos-${VERSION}-source.zip",
-        "link_type": "package"
-      }
-    ]
-  }
-}
+ASSETS_LINKS="$(cat <<EOF
+[
+  {"name":"macOS DMG (arm64)","url":"${API_BASE}/projects/${PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${PACKAGE_VERSION}/Buddy-${PACKAGE_VERSION}-arm64.dmg","link_type":"package"},
+  {"name":"macOS DMG (x64)","url":"${API_BASE}/projects/${PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${PACKAGE_VERSION}/Buddy-${PACKAGE_VERSION}.dmg","link_type":"package"},
+  {"name":"macOS ZIP (arm64)","url":"${API_BASE}/projects/${PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${PACKAGE_VERSION}/Buddy-${PACKAGE_VERSION}-arm64-mac.zip","link_type":"package"},
+  {"name":"macOS ZIP (x64)","url":"${API_BASE}/projects/${PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${PACKAGE_VERSION}/Buddy-${PACKAGE_VERSION}-mac.zip","link_type":"package"},
+  {"name":"Source (.tar.gz)","url":"${API_BASE}/projects/${PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${PACKAGE_VERSION}/buddy-macos-${VERSION}-source.tar.gz","link_type":"package"},
+  {"name":"Source (.zip)","url":"${API_BASE}/projects/${PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${PACKAGE_VERSION}/buddy-macos-${VERSION}-source.zip","link_type":"package"}
+]
 EOF
 )"
-
-TMP_PAYLOAD="$(mktemp)"
-echo "$RELEASE_PAYLOAD" > "$TMP_PAYLOAD"
-glab api --method POST --input "$TMP_PAYLOAD" "/projects/${PROJECT_ID}/releases" >/dev/null \
-  || { echo "   Release creation failed" >&2; rm -f "$TMP_PAYLOAD"; exit 1; }
-rm -f "$TMP_PAYLOAD"
+glab release create "$VERSION" \
+  --name "Buddy ${VERSION}" \
+  --notes "Release ${VERSION}" \
+  --assets-links "$ASSETS_LINKS" \
+  || { echo "   Release creation failed" >&2; exit 1; }
 echo "   Release created ✓"
 
 # --- 9. Deploy to update server ---
