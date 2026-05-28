@@ -270,7 +270,9 @@ ${diffSummary}`
 
     once(child, 'exit').then(() => {
       clearTimeout(timeout)
-      const text = Buffer.concat(chunks).toString('utf8').trim()
+      const raw = Buffer.concat(chunks).toString('utf8').trim()
+      const match = raw.match(/```\w*\n?([\s\S]*?)\n?```$/)
+      const text = (match ? match[1] : raw).trim()
       resolve(text || '')
     }).catch(() => {
       clearTimeout(timeout)

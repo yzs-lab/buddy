@@ -395,6 +395,7 @@ export class BuddyRunner {
     const breakConfirmed = message.kind === 'break' && Boolean(pendingBreak?.actor && pendingBreak.actor !== actor)
     const breakPending = message.kind === 'break' && !breakConfirmed
     const breakRejected = message.kind !== 'break' && Boolean(pendingBreak?.actor)
+    const hasQueuedInstructions = (currentState.instruction_queue?.length ?? 0) > 0
 
     await this.store.appendTranscript(taskId, workspaceKey, normalizeActorRole(actor), transcriptContent, {
       round,
@@ -433,7 +434,7 @@ export class BuddyRunner {
       if (breakConfirmed) {
         return {
           ...next,
-          status: 'DONE',
+          status: hasQueuedInstructions ? 'READY' : 'DONE',
           countdown: null,
           pending_break: null
         }
@@ -463,23 +464,35 @@ export class BuddyRunner {
         run_id: runId,
         payload: { elapsed_ms: elapsedMs, exit_code: exitCode, buddy_type: 'break_confirmed' }
       })
-      await this.store.appendTranscript(
-        taskId,
-        workspaceKey,
-        'system',
-        `${actorDisplayName(pendingBreak?.actor)} 和 ${actorDisplayName(actor)} 均确认任务完成，任务结束。`,
-        { kind: 'round_notice', round }
-      )
-      await this.store.appendTaskEvent(taskId, workspaceKey, {
-        type: 'task.done',
-        payload: {
-          reason: 'dual_break_confirmed',
-          first_actor: pendingBreak?.actor,
-          second_actor: actor,
-          round
-        }
-      })
-      return
+
+      if (hasQueuedInstructions) {
+        await this.store.appendTranscript(
+          taskId,
+          workspaceKey,
+          'system',
+          `${actorDisplayName(pendingBreak?.actor)} 和 ${actorDisplayName(actor)} 均确认当前阶段完成，但指令队列中仍有待执行指令，继续执行。`,
+          { kind: 'round_notice', round }
+        )
+        // Fall through to auto-start logic (skip duplicate actor.finished)
+      } else {
+        await this.store.appendTranscript(
+          taskId,
+          workspaceKey,
+          'system',
+          `${actorDisplayName(pendingBreak?.actor)} 和 ${actorDisplayName(actor)} 均确认任务完成，任务结束。`,
+          { kind: 'round_notice', round }
+        )
+        await this.store.appendTaskEvent(taskId, workspaceKey, {
+          type: 'task.done',
+          payload: {
+            reason: 'dual_break_confirmed',
+            first_actor: pendingBreak?.actor,
+            second_actor: actor,
+            round
+          }
+        })
+        return
+      }
     }
 
     if (breakPending) {
@@ -517,12 +530,14 @@ export class BuddyRunner {
       )
     }
 
-    await this.store.appendTaskEvent(taskId, workspaceKey, {
-      type: 'actor.finished',
-      actor,
-      run_id: runId,
-      payload: { elapsed_ms: elapsedMs, exit_code: exitCode, buddy_type: buddyType }
-    })
+    if (!breakConfirmed) {
+      await this.store.appendTaskEvent(taskId, workspaceKey, {
+        type: 'actor.finished',
+        actor,
+        run_id: runId,
+        payload: { elapsed_ms: elapsedMs, exit_code: exitCode, buddy_type: buddyType }
+      })
+    }
     if (roundWindowReached) {
       await this.store.appendTranscript(
         taskId,

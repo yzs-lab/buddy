@@ -22,22 +22,6 @@ import { projectNameForTask, readStringArraySetting, writeStringArraySetting, is
 
 import type { SettingsTab } from './SettingsContent'
 
-const STATUS_KEYS: Record<TaskStatus, TranslationKey> = {
-  READY: 'status.READY',
-  RUNNING_CLAUDE: 'status.RUNNING_CLAUDE',
-  RUNNING_CODEX: 'status.RUNNING_CODEX',
-  RUNNING_OPENCODE: 'status.RUNNING_OPENCODE',
-  RUNNING_KIMI: 'status.RUNNING_KIMI',
-  COUNTDOWN: 'status.READY',
-  PAUSED: 'status.PAUSED',
-  FAILED: 'status.FAILED',
-  DONE: 'status.DONE',
-}
-
-function statusText(status: TaskStatus, t: TFunction): string {
-  return t(STATUS_KEYS[status] || 'status.READY')
-}
-
 function statusClass(status: TaskStatus): string {
   if (status === 'READY') return 'ready'
   if (status.startsWith('RUNNING_')) return 'running'
@@ -378,9 +362,6 @@ function ChatSidebar({
                           {task.task_id}
                         </span>
                         <span className="text-xs text-fg-muted truncate max-w-[60px]">{proj}</span>
-                        <span className={`task-status-text status-text-${statusClass(task.status)}`}>
-                          {statusText(task.status, t)}
-                        </span>
                         {task.updated_at && (
                           <span className="text-xs text-fg-muted flex-shrink-0 group-hover/task:hidden">
                             {formatRelativeTime(task.updated_at, t)}
@@ -518,9 +499,6 @@ function ChatSidebar({
                           isSelected ? 'text-fg' : 'text-fg-secondary'
                             }`}>
                               {task.task_id}
-                            </span>
-                            <span className={`task-status-text status-text-${statusClass(task.status)}`}>
-                              {statusText(task.status, t)}
                             </span>
                             {task.updated_at && (
                               <span className="text-xs text-fg-muted flex-shrink-0 group-hover/task:hidden">

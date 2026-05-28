@@ -39,10 +39,18 @@ const failureSchema = z.object({
   event_file: z.string().optional()
 })
 
+const attachmentMetaSchema = z.object({
+  path: z.string(),
+  name: z.string(),
+  mimeType: z.string(),
+  size: z.number()
+})
+
 const instructionQueueItemSchema = z.object({
   id: z.string(),
   content: z.string(),
-  created_at: z.string()
+  created_at: z.string(),
+  attachments: z.array(attachmentMetaSchema).optional()
 })
 
 export const taskStateSchema = z.object({

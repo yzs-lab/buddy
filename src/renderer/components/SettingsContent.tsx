@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
+import { HexColorPicker } from 'react-colorful'
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ChevronDown, CircleArrowOutUpLeft, Command, CornerDownLeft, Delete, Monitor, Moon, Option, RotateCcw, Search, Space, Sun } from 'lucide-react'
 import { useTheme, ThemeMode } from '../hooks/useTheme'
 import { getThemesByType, getThemeById, BuddyTheme } from '../themes'
@@ -385,6 +386,162 @@ function LauncherSection({ actor, launcher, info, onSaveCommand }: {
   )
 }
 
+function ColorPickerPopup({
+  color,
+  onChange,
+  onClose,
+  anchorRef,
+}: {
+  color: string
+  onChange: (color: string) => void
+  onClose: () => void
+  anchorRef: React.RefObject<HTMLElement | null>
+}) {
+  const popoverRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        popoverRef.current &&
+        !popoverRef.current.contains(e.target as Node) &&
+        anchorRef.current &&
+        !anchorRef.current.contains(e.target as Node)
+      ) {
+        onClose()
+      }
+    }
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleEsc)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleEsc)
+    }
+  }, [onClose, anchorRef])
+
+  return createPortal(
+    <div
+      ref={popoverRef}
+      className="fixed z-[9999] rounded-xl border border-border bg-bg-elevated p-3 shadow-2xl"
+      style={{
+        top: anchorRef.current
+          ? anchorRef.current.getBoundingClientRect().bottom + 6
+          : 0,
+        left: anchorRef.current
+          ? anchorRef.current.getBoundingClientRect().left
+          : 0,
+      }}
+    >
+      <div>
+        <HexColorPicker color={color} onChange={onChange} />
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
+function ColorBar({
+  label,
+  color,
+  isCustom,
+  onChange,
+  onReset,
+  resetLabel,
+}: {
+  label: string
+  color: string
+  isCustom: boolean
+  onChange: (value: string) => void
+  onReset: () => void
+  resetLabel: string
+}) {
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [editValue, setEditValue] = useState('')
+  const circleRef = useRef<HTMLButtonElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const displayColor = color.toUpperCase()
+
+  useEffect(() => {
+    if (editing && inputRef.current) {
+      inputRef.current.select()
+    }
+  }, [editing])
+
+  const commitEdit = () => {
+    const val = editValue.trim()
+    const hex = val.startsWith('#') ? val : `#${val}`
+    if (/^#[0-9A-Fa-f]{6}$/.test(hex)) {
+      onChange(hex)
+    }
+    setEditing(false)
+  }
+
+  return (
+    <div
+      className="flex items-center gap-3 rounded-lg border border-border-subtle bg-bg-elevated px-3 py-2"
+    >
+      <button
+        ref={circleRef}
+        type="button"
+        className="w-6 h-6 rounded-full border border-border flex-shrink-0 cursor-pointer transition-shadow hover:shadow-[0_0_0_2px_var(--accent)]"
+        style={{ backgroundColor: color }}
+        onClick={() => setPickerOpen((v) => !v)}
+        aria-label={`Pick ${label} color`}
+      />
+      <span className="text-sm text-fg flex-shrink-0 w-12">{label}</span>
+      <div className="flex-1" />
+      {editing ? (
+        <input
+          ref={inputRef}
+          type="text"
+          className="w-[72px] text-xs font-mono text-fg bg-bg-subtle border border-border rounded px-1.5 py-0.5 text-right outline-none focus:border-accent"
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value.toUpperCase())}
+          onBlur={commitEdit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') commitEdit()
+            if (e.key === 'Escape') setEditing(false)
+          }}
+          maxLength={7}
+        />
+      ) : (
+        <span
+          className="text-xs font-mono text-fg-muted cursor-pointer hover:text-fg transition-colors"
+          onClick={() => {
+            setEditValue(displayColor)
+            setEditing(true)
+          }}
+          title="点击编辑色值"
+        >
+          {displayColor}
+        </span>
+      )}
+      {isCustom && (
+        <button
+          type="button"
+          onClick={onReset}
+          className="text-[10px] text-fg-muted hover:text-accent transition-colors ml-1"
+          title={resetLabel}
+        >
+          <RotateCcw size={12} />
+        </button>
+      )}
+      {pickerOpen && (
+        <ColorPickerPopup
+          color={color}
+          onChange={onChange}
+          onClose={() => setPickerOpen(false)}
+          anchorRef={circleRef}
+        />
+      )}
+    </div>
+  )
+}
+
 function AppearanceSettings() {
   const t = useT()
   const {
@@ -512,31 +669,20 @@ function AppearanceSettings() {
 
       {/* Custom Colors */}
       <SettingsSection title={t('settings.appearance.custom.title')} description={t('settings.appearance.custom.desc')}>
-        <div className="rounded-xl border border-border bg-bg-elevated divide-y divide-border-subtle overflow-hidden">
+        <div className="flex flex-col gap-2">
           {colorKeys.map(({ key, labelKey }) => {
             const value = (custom[key] as string | undefined) ?? (currentBaseTheme[key] as string)
             const isCustom = custom[key] !== undefined
             return (
-              <div key={key} className="flex items-center justify-between gap-4 px-4 py-3">
-                <div className="text-sm text-fg">{t(labelKey as any)}</div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    value={value}
-                    onChange={(e) => handleColorChange(key, e.target.value)}
-                    className="w-8 h-8 rounded cursor-pointer border-0 p-0 bg-transparent"
-                  />
-                  <span className="text-xs font-mono text-fg-muted w-16">{value}</span>
-                  {isCustom && (
-                    <button
-                      onClick={() => handleResetColor(key)}
-                      className="text-xs text-accent hover:text-accent-hover underline"
-                    >
-                      {t('settings.appearance.custom.reset')}
-                    </button>
-                  )}
-                </div>
-              </div>
+              <ColorBar
+                key={key}
+                label={t(labelKey as any)}
+                color={value}
+                isCustom={isCustom}
+                onChange={(v) => handleColorChange(key, v)}
+                onReset={() => handleResetColor(key)}
+                resetLabel={t('settings.appearance.custom.reset')}
+              />
             )
           })}
         </div>

@@ -74,6 +74,14 @@ export default function App() {
     saveLastSelectedTask(firstTask.task_id, firstTask.workspace_key)
   }, [tasks, isLoadingTasks, selectedTaskId])
 
+  // Keep selected task's read state in sync while viewing
+  // (handles updated_at bumps from backend during DONE transition, etc.)
+  useEffect(() => {
+    if (!selectedTaskId) return
+    const selectedTask = tasks.find(t => t.task_id === selectedTaskId)
+    if (selectedTask) markTaskAsRead(selectedTaskId)
+  }, [tasks, selectedTaskId])
+
   const createTask = useCreateTask()
   const deleteTask = useDeleteTask()
   const sendMessage = useSendMessage()
