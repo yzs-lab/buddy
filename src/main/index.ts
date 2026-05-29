@@ -8,7 +8,7 @@ import { BuddyCoreService } from './buddy/service'
 import { BuddyEventBus } from './buddy/events'
 import { fixShellPath } from './buddy/shell-path'
 import { setupMenu, updateMenuLanguage } from './menu'
-import { initUpdater, checkForUpdates, downloadUpdate, quitAndInstall } from './updater'
+import { initUpdater, checkForUpdates, downloadUpdate, quitAndInstall, setUpdaterWindow } from './updater'
 import { mkdir, writeFile, stat, readFile, realpath } from 'node:fs/promises'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
@@ -165,6 +165,11 @@ app.whenReady().then(async () => {
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       windowManager.createWindow()
+      const mainWindow = windowManager.getMainWindow()
+      if (mainWindow) {
+        setupMenu(mainWindow)
+        setUpdaterWindow(mainWindow)
+      }
     }
   })
 })

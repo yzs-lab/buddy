@@ -6,16 +6,14 @@ export type UpdaterEvent =
   | { type: 'not-available' }
   | { type: 'progress'; progress: { bytesPerSecond: number; percent: number; transferred: number; total: number } }
   | { type: 'downloaded'; info: { version: string; releaseDate?: string } }
-  | { type: 'error'; message: string }
 
-export type UpdateStatus = 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'error'
+export type UpdateStatus = 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded'
 
 export function useUpdater() {
   const [status, setStatus] = useState<UpdateStatus>('idle')
   const [version, setVersion] = useState<string>('')
   const [progress, setProgress] = useState({ percent: 0, bytesPerSecond: 0 })
   const [mandatory, setMandatory] = useState(false)
-  const [errorMessage, setErrorMessage] = useState('')
   const [dismissed, setDismissed] = useState(false)
 
   useEffect(() => {
@@ -44,10 +42,6 @@ export function useUpdater() {
           setVersion(e.info.version)
           setDismissed(false)
           break
-        case 'error':
-          setStatus('error')
-          setErrorMessage(e.message)
-          break
       }
     })
   }, [])
@@ -68,5 +62,5 @@ export function useUpdater() {
     setDismissed(true)
   }, [])
 
-  return { status, version, progress, mandatory, errorMessage, dismissed, checkForUpdates, downloadUpdate, installUpdate, dismissNotification }
+  return { status, version, progress, mandatory, dismissed, checkForUpdates, downloadUpdate, installUpdate, dismissNotification }
 }

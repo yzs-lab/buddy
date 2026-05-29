@@ -44,35 +44,49 @@ Execute the full release process for version `$ARGUMENTS`. Follow these steps in
 
 ### Step 4: Generate changelog
 
-- Read all commits since the last tag (or all commits if no tag exists)
-- Categorize by conventional commit type:
-  - `feat:` → 新功能
-  - `fix:` → 修复
-  - `refactor:` → 重构
-  - `perf:` → 性能优化
-  - `docs:` → 文档
-  - `ci:` / `chore:` → 工程化
-  - Others → 其他
-- Generate a Chinese changelog in markdown format, e.g.:
+1. Find the previous release tag (latest tag matching `v*`, or none if first release)
+2. Collect all commits between that tag and HEAD, **excluding** `chore: release` commits:
+   ```bash
+   git log <prev-tag>..HEAD --format="%H %s" | grep -v "chore: release"
+   ```
+3. For each remaining commit, read the **actual diff** to understand what changed:
+   ```bash
+   git diff <commit>^..<commit> --stat        # changed files overview
+   git diff <commit>^..<commit> --             # full diff (use for small commits)
+   git log -1 --format="%B" <commit>           # full commit message body
+   ```
+   - For large commits, focus on the diff stat + key file diffs rather than reading every line
+   - Prioritize understanding **user-facing impact** over implementation details
+4. Based on the diffs and commit messages, write a Chinese changelog summarizing the **actual changes**:
+   - Don't just restate commit messages — describe what the change means for users
+   - Group related commits into a single changelog entry when they address the same concern
+   - Use concise, user-facing language (not code-level jargon)
+   - Categorize into these sections (omit empty sections):
+     - `### Added` — new features and capabilities
+     - `### Changed` — behavior changes, improvements, restructures
+     - `### Fixed` — bug fixes and corrections
+     - `### Removed` — removed features or cleanup
+5. Example output:
+   ```markdown
+   ## [1.1.0] - 2026-05-29
 
-```markdown
-## 新功能
-- 支持双架构自动更新 (feat: updater)
+   ### Added
+   - 支持自定义 Actor 命令和超时时间
 
-## 修复
-- 修复倒计时暂停后无法恢复的问题 (fix: countdown)
+   ### Fixed
+   - 修复打包后 .app 无法找到 kimi 命令的问题
 
-## 工程化
-- 精简 CI 配置 (ci: remove macos jobs)
-```
-
-- If there are no commits since last tag, warn the user and ask whether to proceed
+   ### Changed
+   - 优化 PATH 环境变量修复逻辑，始终合并常见工具路径
+   ```
+6. If there are no non-release commits since last tag, warn the user and ask whether to proceed
 
 ### Step 5: Update CHANGELOG.md
 
 - Prepend the generated changelog entry to `CHANGELOG.md`, following the existing format:
   - `## [X.Y.Z] - YYYY-MM-DD` as the version header
-  - Sections: `### Added`, `### Changed`, `### Fixed`, `### Removed`
+  - Sections: `### Added`, `### Changed`, `### Fixed`, `### Removed` (omit empty sections)
+  - Add a `---` separator before the next older entry
   - Add a link reference at the bottom: `[X.Y.Z]: https://gitlab.weibo.cn/ailab/buddy-macos/-/tags/$ARGUMENTS`
 - The new entry goes ABOVE the previous entries, below the `# Changelog` header
 
@@ -90,11 +104,13 @@ Execute the full release process for version `$ARGUMENTS`. Follow these steps in
 
 ### Step 8: Create GitLab Release
 
-- Use `glab release create` with the generated changelog as notes:
-```bash
-glab release create "$ARGUMENTS" --name "Buddy $ARGUMENTS" --notes "<changelog>"
-```
-- If the changelog is multi-line, write it to a temp file first and use `--notes-file`
+- Use the **full changelog** (same content from Step 4, including version header and sections) as release notes
+- If the changelog is multi-line, write it to a temp file first and use `--notes-file`:
+  ```bash
+  echo "$CHANGELOG" > /tmp/release-notes-$VERSION.md
+  glab release create "$ARGUMENTS" --name "Buddy $ARGUMENTS" --notes-file /tmp/release-notes-$VERSION.md
+  rm /tmp/release-notes-$VERSION.md
+  ```
 
 ### Step 9: Run release script
 

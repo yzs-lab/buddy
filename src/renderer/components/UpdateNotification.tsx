@@ -22,7 +22,7 @@ export function UpdateNotification({
   const t = useT()
 
   // Only show downloading and downloaded states as bottom-right notification
-  if (status === 'idle' || status === 'checking' || status === 'available' || status === 'error') return null
+  if (status === 'idle' || status === 'checking' || status === 'available') return null
   if (dismissed) return null
 
   return (

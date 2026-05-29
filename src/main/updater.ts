@@ -21,7 +21,6 @@ export type UpdaterEvent =
   | { type: 'not-available' }
   | { type: 'progress'; progress: DownloadProgress }
   | { type: 'downloaded'; info: UpdateInfo }
-  | { type: 'error'; message: string }
 
 // ELECTRON_UPDATER_ALLOW_HTTP is set in src/main/index.ts before this module is imported.
 
@@ -32,7 +31,9 @@ let mainWindow: BrowserWindow | null = null
 let initialized = false
 
 function sendToRenderer(event: UpdaterEvent): void {
-  mainWindow?.webContents.send('updater:event', event)
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('updater:event', event)
+  }
 }
 
 export function initUpdater(window: BrowserWindow): void {
@@ -81,14 +82,18 @@ export function initUpdater(window: BrowserWindow): void {
     })
   })
 
-  autoUpdater.on('error', (err: Error | null) => {
-    sendToRenderer({ type: 'error', message: err?.message ?? 'Unknown error' })
+  autoUpdater.on('error', (_err: Error | null) => {
+    sendToRenderer({ type: 'not-available' })
   })
 
   // Delay first check to avoid impacting startup
   setTimeout(() => {
     autoUpdater.checkForUpdates().catch(() => {})
   }, 5000)
+}
+
+export function setUpdaterWindow(window: BrowserWindow): void {
+  mainWindow = window
 }
 
 export function checkForUpdates(): void {

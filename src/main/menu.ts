@@ -138,7 +138,7 @@ function getLabels() {
   return menuLabels[currentLang] ?? menuLabels['en']
 }
 
-function buildMenu(mainWindow: BrowserWindow): Menu {
+function buildMenu(): Menu {
   const t = getLabels()
   const template: Electron.MenuItemConstructorOptions[] = [
     {
@@ -149,12 +149,12 @@ function buildMenu(mainWindow: BrowserWindow): Menu {
         {
           label: t.preferences,
           accelerator: 'CmdOrCtrl+,',
-          click: () => mainWindow.webContents.send('menu:action', 'openSettings')
+          click: () => sendMenuAction('openSettings')
         },
         { type: 'separator' },
         {
           label: t.checkForUpdates,
-          click: () => mainWindow.webContents.send('menu:action', 'checkForUpdates')
+          click: () => sendMenuAction('checkForUpdates')
         },
         { type: 'separator' },
         { role: 'services', label: t.services },
@@ -172,7 +172,7 @@ function buildMenu(mainWindow: BrowserWindow): Menu {
         {
           label: t.newTask,
           accelerator: 'CmdOrCtrl+N',
-          click: () => mainWindow.webContents.send('menu:action', 'newTask')
+          click: () => sendMenuAction('newTask')
         },
         { type: 'separator' },
         { role: 'close', label: t.closeWindow }
@@ -196,23 +196,23 @@ function buildMenu(mainWindow: BrowserWindow): Menu {
         {
           label: t.prevTask,
           accelerator: 'CmdOrCtrl+Shift+[',
-          click: () => mainWindow.webContents.send('menu:action', 'prevTask')
+          click: () => sendMenuAction('prevTask')
         },
         {
           label: t.nextTask,
           accelerator: 'CmdOrCtrl+Shift+]',
-          click: () => mainWindow.webContents.send('menu:action', 'nextTask')
+          click: () => sendMenuAction('nextTask')
         },
         { type: 'separator' },
         {
           label: t.toggleSidebar,
           accelerator: 'CmdOrCtrl+B',
-          click: () => mainWindow.webContents.send('menu:action', 'toggleSidebar')
+          click: () => sendMenuAction('toggleSidebar')
         },
         {
           label: t.toggleStatusBar,
           accelerator: 'CmdOrCtrl+Alt+B',
-          click: () => mainWindow.webContents.send('menu:action', 'toggleStatusBar')
+          click: () => sendMenuAction('toggleStatusBar')
         },
         { type: 'separator' },
         { role: 'reload', label: t.reload },
@@ -256,7 +256,7 @@ function buildMenu(mainWindow: BrowserWindow): Menu {
         {
           label: t.keyboardShortcuts,
           accelerator: 'CmdOrCtrl+/',
-          click: () => mainWindow.webContents.send('menu:action', 'showKeyboardShortcuts')
+          click: () => sendMenuAction('showKeyboardShortcuts')
         }
       ]
     }
@@ -265,9 +265,15 @@ function buildMenu(mainWindow: BrowserWindow): Menu {
   return Menu.buildFromTemplate(template)
 }
 
+function sendMenuAction(action: string): void {
+  if (cachedMainWindow && !cachedMainWindow.isDestroyed()) {
+    cachedMainWindow.webContents.send('menu:action', action)
+  }
+}
+
 export function setupMenu(mainWindow: BrowserWindow): void {
   cachedMainWindow = mainWindow
-  const menu = buildMenu(mainWindow)
+  const menu = buildMenu()
   Menu.setApplicationMenu(menu)
 }
 
@@ -275,8 +281,6 @@ export function updateMenuLanguage(lang: string): void {
   if (lang !== 'zh-CN' && lang !== 'zh-TW' && lang !== 'en') return
   if (lang === currentLang) return
   currentLang = lang
-  if (cachedMainWindow && !cachedMainWindow.isDestroyed()) {
-    const menu = buildMenu(cachedMainWindow)
-    Menu.setApplicationMenu(menu)
-  }
+  const menu = buildMenu()
+  Menu.setApplicationMenu(menu)
 }
