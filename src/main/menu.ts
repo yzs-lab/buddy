@@ -6,6 +6,7 @@ const menuLabels = {
   'en': {
     about: 'About Buddy',
     preferences: 'Preferences...',
+    checkForUpdates: 'Check for Updates...',
     services: 'Services',
     hide: 'Hide Buddy',
     hideOthers: 'Hide Others',
@@ -47,6 +48,7 @@ const menuLabels = {
   'zh-CN': {
     about: '关于 Buddy',
     preferences: '偏好设置...',
+    checkForUpdates: '检查更新...',
     services: '服务',
     hide: '隐藏 Buddy',
     hideOthers: '隐藏其他',
@@ -88,6 +90,7 @@ const menuLabels = {
   'zh-TW': {
     about: '關於 Buddy',
     preferences: '偏好設定...',
+    checkForUpdates: '檢查更新…',
     services: '服務',
     hide: '隱藏 Buddy',
     hideOthers: '隱藏其他',
@@ -147,6 +150,11 @@ function buildMenu(mainWindow: BrowserWindow): Menu {
           label: t.preferences,
           accelerator: 'CmdOrCtrl+,',
           click: () => mainWindow.webContents.send('menu:action', 'openSettings')
+        },
+        { type: 'separator' },
+        {
+          label: t.checkForUpdates,
+          click: () => mainWindow.webContents.send('menu:action', 'checkForUpdates')
         },
         { type: 'separator' },
         { role: 'services', label: t.services },

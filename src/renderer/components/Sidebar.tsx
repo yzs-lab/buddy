@@ -11,13 +11,15 @@ import {
   SquarePen,
   SquarePlus,
   Sun,
-  Trash2
+  Trash2,
+  Upload
 } from 'lucide-react'
 import { Task, TaskStatus } from '../../shared/types'
 import { ResizeHandle } from './ResizeHandle'
 import { useT } from '../hooks/useI18n'
 import type { TFunction } from '../hooks/useI18n'
 import type { TranslationKey } from '../lib/i18n'
+import type { UpdateStatus } from '../hooks/useUpdater'
 import { projectNameForTask, readStringArraySetting, writeStringArraySetting, isTaskUnread } from '../lib/taskList'
 
 import type { SettingsTab } from './SettingsContent'
@@ -41,6 +43,9 @@ interface SidebarProps {
   isHealthy: boolean
   view: 'chat' | 'settings'
   settingsTab: SettingsTab
+  updateStatus: UpdateStatus
+  updateVersion: string
+  onUpdateClick: () => void
   onSelectTask: (taskId: string, workspaceKey: string) => void
   onCreateTask: (repoRoot?: string) => void
   onDeleteTask: (taskId: string, workspaceKey: string) => void
@@ -66,6 +71,9 @@ export function Sidebar({
   isHealthy,
   view,
   settingsTab,
+  updateStatus,
+  updateVersion,
+  onUpdateClick,
   onSelectTask,
   onCreateTask,
   onDeleteTask,
@@ -115,6 +123,9 @@ export function Sidebar({
           isLoading={isLoading}
           error={error}
           isHealthy={isHealthy}
+          updateStatus={updateStatus}
+          updateVersion={updateVersion}
+          onUpdateClick={onUpdateClick}
           onSelectTask={onSelectTask}
           onCreateTask={onCreateTask}
           onDeleteTask={onDeleteTask}
@@ -206,6 +217,9 @@ function ChatSidebar({
   isLoading,
   error,
   isHealthy,
+  updateStatus,
+  updateVersion,
+  onUpdateClick,
   onSelectTask,
   onCreateTask,
   onDeleteTask,
@@ -221,6 +235,9 @@ function ChatSidebar({
   isLoading: boolean
   error: Error | null
   isHealthy: boolean
+  updateStatus: UpdateStatus
+  updateVersion: string
+  onUpdateClick: () => void
   onSelectTask: (taskId: string, workspaceKey: string) => void
   onCreateTask: (repoRoot?: string) => void
   onDeleteTask: (taskId: string, workspaceKey: string) => void
@@ -299,7 +316,27 @@ function ChatSidebar({
   return (
     <>
       <div className="px-4 pt-2 pb-2">
-        <div className="text-xl font-bold">{t('app.brand')}</div>
+        <div className="flex items-center gap-2">
+          <div className="text-xl font-bold">{t('app.brand')}</div>
+          {(updateStatus === 'available' || updateStatus === 'downloading' || updateStatus === 'downloaded') && (
+            <button
+              onClick={onUpdateClick}
+              className={`px-2 py-0.5 text-[10px] font-medium rounded-full flex items-center gap-1 ${
+                updateStatus === 'downloading'
+                  ? 'bg-accent-soft text-fg-secondary cursor-default'
+                  : 'bg-accent-soft text-accent-primary hover:bg-accent-soft-hover'
+              }`}
+              disabled={updateStatus === 'downloading'}
+            >
+              <Upload size={10} strokeWidth={2.5} />
+              {updateStatus === 'downloading'
+                ? t('updater.sidebarDownloading')
+                : updateStatus === 'downloaded'
+                  ? t('updater.sidebarReady', { version: updateVersion })
+                  : t('updater.sidebarUpdate', { version: updateVersion })}
+            </button>
+          )}
+        </div>
         <div className="text-xs text-fg-secondary">{t('app.tagline')}</div>
       </div>
 

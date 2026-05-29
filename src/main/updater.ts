@@ -25,7 +25,7 @@ export type UpdaterEvent =
 
 // ELECTRON_UPDATER_ALLOW_HTTP is set in src/main/index.ts before this module is imported.
 
-autoUpdater.autoDownload = true
+autoUpdater.autoDownload = false
 autoUpdater.autoInstallOnAppQuit = true
 
 let mainWindow: BrowserWindow | null = null
@@ -93,6 +93,10 @@ export function initUpdater(window: BrowserWindow): void {
 
 export function checkForUpdates(): void {
   autoUpdater.checkForUpdates().catch(() => {})
+}
+
+export function downloadUpdate(): void {
+  autoUpdater.downloadUpdate().catch(() => {})
 }
 
 export function quitAndInstall(): void {

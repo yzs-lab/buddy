@@ -30,6 +30,9 @@ const api = {
   checkForUpdates: (): void => {
     ipcRenderer.invoke('updater:check')
   },
+  downloadUpdate: (): void => {
+    ipcRenderer.invoke('updater:download')
+  },
   installUpdate: (): void => {
     ipcRenderer.invoke('updater:install')
   },

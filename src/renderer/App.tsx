@@ -12,6 +12,7 @@ import { ChatArea } from './components/ChatArea'
 import { StatusBar } from './components/StatusBar'
 import { SettingsContent, SettingsTab } from './components/SettingsContent'
 import { UpdateNotification } from './components/UpdateNotification'
+import { useUpdater } from './hooks/useUpdater'
 import { ACTOR_LABEL_KEY, Actor } from './lib/format'
 import { isTaskReadyToStart } from './lib/taskState'
 import { readStringArraySetting, visibleTasksForShortcuts, markTaskAsRead, readLastSelectedTask, saveLastSelectedTask, clearLastSelectedTask } from './lib/taskList'
@@ -42,6 +43,7 @@ export default function App() {
   })
 
   useTheme()
+  const updater = useUpdater()
 
   useEffect(() => {
     window.api.isFullScreen().then(setIsFullScreen).catch(() => {})
@@ -435,6 +437,8 @@ export default function App() {
         setIsSidebarOpen(prev => !prev)
       } else if (action === 'toggleStatusBar') {
         setIsStatusBarOpen(prev => !prev)
+      } else if (action === 'checkForUpdates') {
+        updater.checkForUpdates()
       } else if (action === 'openDocumentation') {
         window.open('https://gitlab.weibo.cn/ailab/buddy-macos/-/tree/main/docs', '_blank')
       } else if (action === 'openWhatsNew') {
@@ -447,7 +451,7 @@ export default function App() {
       }
     })
     return cleanup
-  }, [handleOpenCreateModal, selectVisibleTaskByOffset])
+  }, [handleOpenCreateModal, selectVisibleTaskByOffset, updater])
 
   const selectVisibleTaskBySlot = useCallback((slot: number) => {
     const visibleTasks = visibleTasksForShortcuts(
@@ -515,6 +519,9 @@ export default function App() {
         isFullScreen={isFullScreen}
         view={view}
         settingsTab={settingsTab}
+        updateStatus={updater.status}
+        updateVersion={updater.version}
+        onUpdateClick={updater.downloadUpdate}
         onSelectTask={handleSelectTask}
         onCreateTask={handleOpenCreateModal}
         onDeleteTask={handleDeleteTask}
@@ -603,7 +610,14 @@ export default function App() {
       )}
 
       {/* 更新通知 */}
-      <UpdateNotification />
+      <UpdateNotification
+        status={updater.status}
+        version={updater.version}
+        progress={updater.progress}
+        dismissed={updater.dismissed}
+        onInstall={updater.installUpdate}
+        onDismiss={updater.dismissNotification}
+      />
     </div>
   )
 }

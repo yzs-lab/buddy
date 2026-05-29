@@ -340,6 +340,9 @@ const en = {
   'updater.restartHint': 'Restart the app to complete the update.',
   'updater.restart': 'Restart to Update',
   'updater.error': 'Update failed',
+  'updater.sidebarUpdate': 'Update v{version}',
+  'updater.sidebarDownloading': 'Updating…',
+  'updater.sidebarReady': 'Ready v{version}',
 }
 
 // Simplified Chinese — preserves the original wording in the codebase.
@@ -633,6 +636,9 @@ const zhCN: typeof en = {
   'updater.restartHint': '重启应用以完成更新。',
   'updater.restart': '重启并更新',
   'updater.error': '更新失败',
+  'updater.sidebarUpdate': '更新 v{version}',
+  'updater.sidebarDownloading': '更新中…',
+  'updater.sidebarReady': '就绪 v{version}',
 }
 
 // Traditional Chinese
@@ -928,6 +934,9 @@ const zhTW: typeof en = {
   'updater.restartHint': '重啟應用以完成更新。',
   'updater.restart': '重啟並更新',
   'updater.error': '更新失敗',
+  'updater.sidebarUpdate': '更新 v{version}',
+  'updater.sidebarDownloading': '更新中…',
+  'updater.sidebarReady': '就緒 v{version}',
 }
 
 const dictionaries: Record<Language, typeof en> = {

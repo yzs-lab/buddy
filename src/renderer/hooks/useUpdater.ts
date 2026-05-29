@@ -16,6 +16,7 @@ export function useUpdater() {
   const [progress, setProgress] = useState({ percent: 0, bytesPerSecond: 0 })
   const [mandatory, setMandatory] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
+  const [dismissed, setDismissed] = useState(false)
 
   useEffect(() => {
     if (!window.api?.onUpdaterEvent) return
@@ -29,6 +30,7 @@ export function useUpdater() {
           setStatus('available')
           setVersion(e.info.version)
           setMandatory(e.info.mandatory ?? false)
+          setDismissed(false)
           break
         case 'not-available':
           setStatus('idle')
@@ -40,6 +42,7 @@ export function useUpdater() {
         case 'downloaded':
           setStatus('downloaded')
           setVersion(e.info.version)
+          setDismissed(false)
           break
         case 'error':
           setStatus('error')
@@ -53,9 +56,17 @@ export function useUpdater() {
     window.api?.checkForUpdates?.()
   }, [])
 
+  const downloadUpdate = useCallback(() => {
+    window.api?.downloadUpdate?.()
+  }, [])
+
   const installUpdate = useCallback(() => {
     window.api?.installUpdate?.()
   }, [])
 
-  return { status, version, progress, mandatory, errorMessage, checkForUpdates, installUpdate }
+  const dismissNotification = useCallback(() => {
+    setDismissed(true)
+  }, [])
+
+  return { status, version, progress, mandatory, errorMessage, dismissed, checkForUpdates, downloadUpdate, installUpdate, dismissNotification }
 }
