@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.10] - 2026-05-29
+
+### Added
+- 外部链接自动在系统浏览器中打开：应用内点击链接不再导航到空白页，而是拦截并调用系统浏览器
+- Break 驳回机制：当一方请求 break 而另一方继续修改代码时，break 请求被驳回，请求方需重新审查变更后再确认
+- `shell:openExternal` IPC 通道，供渲染进程打开外部 URL
+
+### Changed
+- 健康检查 prompt 改为更自然的问候式，不再要求固定 JSON 格式回复
+- 健康检查增加空响应校验，actor 返回空内容视为失败
+- Codex actor 健康检查优先使用 threadId 显示会话标识
+- 更新下载完成后侧边栏按钮改为醒目的主色样式，文案改为"重启并更新"
+- Launcher 配置输入框与保存按钮改为行内布局，改善编辑体验
+
+---
+
 ## [1.0.9] - 2026-05-29
 
 ### Added
@@ -188,6 +204,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - 项目需求文档 (REQUIREMENTS.md)
 - 项目结构初始化
 
+[1.0.10]: https://gitlab.weibo.cn/ailab/buddy-macos/-/tags/v1.0.10
 [1.0.9]: https://gitlab.weibo.cn/ailab/buddy-macos/-/tags/v1.0.9
 [1.0.8]: https://gitlab.weibo.cn/ailab/buddy-macos/-/tags/v1.0.8
 [1.0.7]: https://gitlab.weibo.cn/ailab/buddy-macos/-/tags/v1.0.7
