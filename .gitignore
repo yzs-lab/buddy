@@ -4,7 +4,10 @@ out
 release
 .DS_Store
 *.log
-.claude
+.claude/settings.local.json
+.claude/todos/
+.claude/memory/
+.claude/scheduled_tasks.json
 .pnpm-store
 .worktrees
 test-results

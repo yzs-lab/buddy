@@ -32,8 +32,13 @@ RSYNC_PASS_FILE="${RSYNC_PASS_FILE:-$HOME/.rsyncd.pass}"
 RSYNC_DEST="rsync://buddyweb@10.185.10.105/buddyweb-releases/"
 PACKAGE_NAME="buddy-macos"
 
-# --- Derive GitLab info from remote ---
-REMOTE_URL="$(git remote get-url origin)"
+# --- Derive GitLab info from remote (prefer upstream to match glab) ---
+if git remote get-url upstream >/dev/null 2>&1; then
+  REMOTE_NAME="upstream"
+else
+  REMOTE_NAME="origin"
+fi
+REMOTE_URL="$(git remote get-url "$REMOTE_NAME")"
 if [[ "$REMOTE_URL" == ssh://git@* ]]; then
   REST="${REMOTE_URL#ssh://git@}"
   GITLAB_HOST="${REST%%:*}"
@@ -59,6 +64,7 @@ API_BASE="https://${GITLAB_HOST}/api/v4"
 
 echo "=== Buddy Release ${VERSION} ==="
 echo "GitLab: ${GITLAB_HOST} / ${PROJECT_PATH}"
+echo "Remote: ${REMOTE_NAME} ($(git remote get-url "$REMOTE_NAME"))"
 echo ""
 
 # --- 1. Bump version in package.json ---
@@ -117,7 +123,12 @@ else
   git diff --cached --quiet || git commit -m "chore: release ${VERSION}"
   echo ">> Pushing tag ${VERSION}..."
   git tag "$VERSION"
-  git push origin main "$VERSION"
+  git push "$REMOTE_NAME" main "$VERSION"
+  # Also push to origin if it's a different remote (keep fork in sync)
+  if [ "$REMOTE_NAME" != "origin" ] && git remote get-url origin >/dev/null 2>&1; then
+    echo "   Also pushing to origin (fork sync)..."
+    git push origin main "$VERSION" || true
+  fi
   echo "   Tag pushed ✓"
 fi
 
@@ -197,4 +208,5 @@ echo "   Deploy complete ✓"
 echo ""
 echo "=== Release ${VERSION} published! ==="
 echo "  GitLab:   https://${GITLAB_HOST}/${PROJECT_PATH}/-/releases/${VERSION}"
+echo "  Remote:   ${REMOTE_NAME}"
 echo "  Download: http://buddy.intra.weibo.cn/releases/"
