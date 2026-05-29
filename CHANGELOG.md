@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.3] - 2026-05-29
+
+### Changed
+
+- 移除 .gitlab-ci.yml，发布流程全部由本地 release.sh 完成
+- 精简 CI 配置，移除 typecheck 和 unit-test
+
+### Fixed
+
+- release.sh 已存在的资产链接用 PUT 覆盖而非跳过
+- release.sh Release 已存在时只更新资产链接，不覆盖 name/notes
+- release.sh Release 创建失败时容忍已存在的资产链接
+
+---
+
 ## [1.0.0] - 2026-05-28
 
 ### Added
@@ -98,4 +113,5 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - 项目需求文档 (REQUIREMENTS.md)
 - 项目结构初始化
 
+[1.0.3]: https://gitlab.weibo.cn/ailab/buddy-macos/-/tags/v1.0.3
 [1.0.0]: https://gitlab.weibo.cn/ailab/buddy-macos/-/tags/v1.0.0
