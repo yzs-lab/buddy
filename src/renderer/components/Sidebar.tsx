@@ -317,7 +317,7 @@ function ChatSidebar({
     <>
       <div className="px-4 pt-2 pb-2">
         <div className="flex items-center gap-2">
-          <div className="text-xl font-bold">{t('app.brand')}</div>
+          <div className="text-xl font-bold flex-1">{t('app.brand')}</div>
           {(updateStatus === 'available' || updateStatus === 'downloading' || updateStatus === 'downloaded') && (
             <button
               onClick={onUpdateClick}

@@ -203,6 +203,13 @@ find release -maxdepth 1 \( -name '*.dmg' -o -name '*.zip' \) \
 # Upload latest-mac.yml last (atomic commit point)
 find release -maxdepth 1 -name 'latest-mac.yml' \
   -exec rsync -avz --password-file="$RSYNC_PASS_FILE" {} "$RSYNC_DEST" \;
+
+# Deploy stable-name latest DMGs for web download page
+LATEST_DIR="release/latest"
+mkdir -p "$LATEST_DIR"
+cp "release/Buddy-${PACKAGE_VERSION}-arm64.dmg" "${LATEST_DIR}/buddy-arm64.dmg"
+cp "release/Buddy-${PACKAGE_VERSION}.dmg" "${LATEST_DIR}/buddy-x64.dmg"
+rsync -avz --password-file="$RSYNC_PASS_FILE" "${LATEST_DIR}/" "${RSYNC_DEST}latest/"
 echo "   Deploy complete ✓"
 
 echo ""
@@ -210,3 +217,5 @@ echo "=== Release ${VERSION} published! ==="
 echo "  GitLab:   https://${GITLAB_HOST}/${PROJECT_PATH}/-/releases/${VERSION}"
 echo "  Remote:   ${REMOTE_NAME}"
 echo "  Download: http://buddy.intra.weibo.cn/releases/"
+echo "  Latest:   http://buddy.intra.weibo.cn/releases/latest/buddy-arm64.dmg"
+echo "            http://buddy.intra.weibo.cn/releases/latest/buddy-x64.dmg"

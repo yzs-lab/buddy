@@ -116,7 +116,9 @@ Execute the full release process for version `$ARGUMENTS`. Follow these steps in
 
 - Execute `scripts/release.sh $ARGUMENTS`
 - This handles: build → verify → upload to Package Registry → update Release assets → rsync deploy
-- The script auto-detects the release remote (prefers `upstream` over `origin`) to match `glab`'s project target
+- The script also deploys stable-name latest DMGs to `/releases/latest/` on the update server:
+  - `latest/buddy-arm64.dmg` → latest Apple Silicon build
+  - `latest/buddy-x64.dmg` → latest Intel build
 - Monitor the output and report progress to the user
 
 ### Step 10: Report results
@@ -125,6 +127,9 @@ When complete, summarize:
 - Version released
 - GitLab Release URL
 - Update server URL
+- Latest download links:
+  - http://buddy.intra.weibo.cn/releases/latest/buddy-arm64.dmg
+  - http://buddy.intra.weibo.cn/releases/latest/buddy-x64.dmg
 - Any warnings or issues encountered
 
 ## Error handling
