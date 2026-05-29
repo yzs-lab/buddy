@@ -24,12 +24,13 @@ export type UpdaterEvent =
 
 // ELECTRON_UPDATER_ALLOW_HTTP is set in src/main/index.ts before this module is imported.
 
-autoUpdater.autoDownload = false
+autoUpdater.autoDownload = true
 autoUpdater.autoInstallOnAppQuit = true
 autoUpdater.disableDifferentialDownload = true
 
 let mainWindow: BrowserWindow | null = null
 let initialized = false
+let checkInterval: ReturnType<typeof setInterval> | null = null
 
 function sendToRenderer(event: UpdaterEvent): void {
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -91,6 +92,11 @@ export function initUpdater(window: BrowserWindow): void {
   setTimeout(() => {
     autoUpdater.checkForUpdates().catch(() => {})
   }, 5000)
+
+  // Periodic re-check every 30 minutes
+  checkInterval = setInterval(() => {
+    autoUpdater.checkForUpdates().catch(() => {})
+  }, 30 * 60 * 1000)
 }
 
 export function setUpdaterWindow(window: BrowserWindow): void {

@@ -115,7 +115,7 @@ export function ChatArea({ task, hasAnyTasks, onSendMessage, onStartTask, onInte
                 <div className="text-xs text-fg-muted/70 mb-5">{t('chat.onboarding.cliHint')}</div>
                 <button
                   type="button"
-                  onClick={onCreateTask}
+                  onClick={() => onCreateTask()}
                   className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg bg-accent-primary text-fg-inverse hover:bg-accent-primary-hover transition-colors cursor-pointer"
                 >
                   <Plus size={16} />

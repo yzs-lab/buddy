@@ -266,7 +266,6 @@ body {
 .running-status-expanded {
   border-bottom-left-radius: 0 !important;
   border-bottom-right-radius: 0 !important;
-  border-bottom-color: transparent !important;
   margin-bottom: 0 !important;
 }
 .running-expand-btn {
@@ -297,6 +296,7 @@ body {
   border-radius: 0 0 8px 8px;
   border: 1.5px solid color-mix(in srgb, var(--actor-color) 25%, var(--border));
   border-top: none;
+  margin-top: -1.5px;
   background: color-mix(in srgb, var(--actor-color) 3%, var(--bg-elevated));
   overflow: hidden;
   margin-bottom: 12px;

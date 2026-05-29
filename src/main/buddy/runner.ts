@@ -362,7 +362,9 @@ export class BuddyRunner {
         parsedLines.push({ sessionId })
       }
 
-      if (result.exitCode !== 0) {
+      const errorOnlyOutput = parsedLines.some((l) => l.rawType === 'error')
+        && !parsedLines.some((l) => l.rawType !== 'error' && l.text)
+      if (result.exitCode !== 0 || errorOnlyOutput) {
         const parts: string[] = []
         const stderrText = stderrLines.join('\n').trim()
         if (stderrText) parts.push(stderrText)
@@ -370,6 +372,11 @@ export class BuddyRunner {
         if (eventError) parts.push(eventError)
         if (outputText.trim()) parts.push(outputText.trim())
         throw new Error(parts.join('\n\n') || `Actor exited with ${result.exitCode}`)
+      }
+
+      // Ghost output: raw events exist but nothing was extracted (unrecognized error format)
+      if (!outputText.trim() && rawEvents.trim()) {
+        throw new Error(rawEvents.trim().slice(0, 500))
       }
 
       await this.completeActor(taskId, workspaceKey, actor, runId, outputText, parsedLines, elapsedMs, result.exitCode ?? 0)
@@ -605,11 +612,54 @@ export class BuddyRunner {
       actor,
       ts: new Date().toISOString()
     }
+    const stateBefore = await this.store.readTaskState(taskId, workspaceKey)
+    const pendingBreak = stateBefore.pending_break
+    const otherActorBreak = pendingBreak?.actor && pendingBreak.actor !== actor ? pendingBreak : null
+
+    if (otherActorBreak) {
+      const round = stateBefore.round ?? 0
+      await this.store.updateTaskState(taskId, workspaceKey, (state) => ({
+        ...state,
+        status: 'DONE',
+        active_run: null,
+        pending_break: null,
+        updated_at: failure.ts
+      }))
+      await this.store.appendTaskEvent(taskId, workspaceKey, {
+        type: 'actor.failed',
+        actor,
+        run_id: runId,
+        payload: { error: message, run_id: runId }
+      })
+      await this.store.appendTranscript(
+        taskId,
+        workspaceKey,
+        'system',
+        `${actorDisplayName(otherActorBreak.actor)} 请求结束任务，${actorDisplayName(actor)} 因错误无法继续，自动确认结束。`,
+        { kind: 'round_notice', round }
+      )
+      await this.store.appendTaskEvent(taskId, workspaceKey, {
+        type: 'task.done',
+        payload: {
+          reason: 'break_confirmed_on_failure',
+          first_actor: otherActorBreak.actor,
+          second_actor: actor,
+          round
+        }
+      })
+      return
+    }
+
+    const newConsecutiveFailures = (stateBefore.consecutive_failures ?? 0) + 1
+    const globalSettings = await this.store.readGlobalSettings()
+    const maxConsecutiveFailures = globalSettings.max_consecutive_failures ?? 3
+    const thresholdReached = newConsecutiveFailures >= maxConsecutiveFailures
+
     await this.store.updateTaskState(taskId, workspaceKey, (state) => ({
       ...state,
-      status: 'FAILED',
+      status: thresholdReached ? 'PAUSED' : 'FAILED',
       active_run: null,
-      consecutive_failures: (state.consecutive_failures ?? 0) + 1,
+      consecutive_failures: newConsecutiveFailures,
       last_error: failure,
       latest_failure: failure,
       updated_at: failure.ts
@@ -620,6 +670,19 @@ export class BuddyRunner {
       run_id: runId,
       payload: { error: message, run_id: runId }
     })
+    if (thresholdReached) {
+      await this.store.appendTranscript(
+        taskId,
+        workspaceKey,
+        'system',
+        `${actorDisplayName(actor)} 连续失败 ${newConsecutiveFailures} 次，已达到上限 (${maxConsecutiveFailures})，暂停等待用户处理。`,
+        { kind: 'round_notice', round: stateBefore.round ?? 0 }
+      )
+      await this.store.appendTaskEvent(taskId, workspaceKey, {
+        type: 'failure_threshold.reached',
+        payload: { consecutive_failures: newConsecutiveFailures, max_consecutive_failures: maxConsecutiveFailures }
+      })
+    }
   }
 }
 

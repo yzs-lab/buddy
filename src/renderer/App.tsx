@@ -68,6 +68,16 @@ export default function App() {
     if (bootstrap?.locale) setServerLocale(bootstrap.locale)
   }, [bootstrap?.locale])
 
+  // Clean up stale localStorage values from previous bugs
+  useEffect(() => {
+    try {
+      const last = localStorage.getItem('buddy.lastRepoRoot')
+      if (last === '[object Object]' || (last && typeof last !== 'string')) {
+        localStorage.removeItem('buddy.lastRepoRoot')
+      }
+    } catch {}
+  }, [])
+
   // Auto-select: restore last selection or default to first task
   useEffect(() => {
     if (isLoadingTasks || tasks.length === 0) return
@@ -180,14 +190,15 @@ export default function App() {
     settings: Record<string, unknown>
   ) => {
     try {
-      const finalRepoRoot = (repoRoot && repoRoot !== '/' ? repoRoot : null) || bootstrap?.home_dir || ''
+      const finalRepoRoot = (repoRoot && repoRoot !== '/' && repoRoot !== '[object Object]' ? repoRoot : null)
+        || (typeof bootstrap?.home_dir === 'string' ? bootstrap.home_dir : '') || ''
       const result = await createTask.mutateAsync({
         task_id: taskId,
         repo_root: finalRepoRoot || undefined,
         task_text: taskText,
         settings
       })
-      if (finalRepoRoot) {
+      if (finalRepoRoot && finalRepoRoot !== '[object Object]') {
         try { localStorage.setItem('buddy.lastRepoRoot', finalRepoRoot) } catch {}
       }
       setSelectedTaskId(result.task)
@@ -213,18 +224,18 @@ export default function App() {
     }
   }, [bootstrap, createTask, t])
 
-  const handleOpenCreateModal = useCallback((repoRoot?: string) => {
-    setPendingRepoRoot(repoRoot ?? null)
+  const handleOpenCreateModal = useCallback((repoRoot?: unknown) => {
+    setPendingRepoRoot(typeof repoRoot === 'string' && repoRoot ? repoRoot : null)
     setShowCreateModal(true)
   }, [])
 
   const modalDefaultRepoRoot = (() => {
-    if (pendingRepoRoot) return pendingRepoRoot
+    if (typeof pendingRepoRoot === 'string' && pendingRepoRoot) return pendingRepoRoot
     try {
       const last = localStorage.getItem('buddy.lastRepoRoot')
-      if (last) return last
+      if (last && last !== '[object Object]') return last
     } catch {}
-    return bootstrap?.home_dir ?? ''
+    return typeof bootstrap?.home_dir === 'string' ? bootstrap.home_dir : ''
   })()
 
   const handleSendMessage = useCallback(async (message: string, actor?: string, attachments?: Attachment[]) => {
@@ -527,7 +538,7 @@ export default function App() {
         settingsTab={settingsTab}
         updateStatus={updater.status}
         updateVersion={updater.version}
-        onUpdateClick={updater.downloadUpdate}
+        onUpdateClick={updater.status === 'downloaded' ? updater.installUpdate : updater.checkForUpdates}
         onSelectTask={handleSelectTask}
         onCreateTask={handleOpenCreateModal}
         onDeleteTask={handleDeleteTask}
