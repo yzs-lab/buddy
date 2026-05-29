@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.7] - 2026-05-29
+
+### Added
+- 运行时可展开 Actor 实时输出面板，查看 AI Actor 的 stdout 流式输出
+- 欢迎页增加"新建任务"按钮与 CLI 配置提示
+
+### Changed
+- Prompt 增加连续失败信息和循环卡顿时的 break 指引，避免 Actor 陷入无效循环
+- 语言检测增加主进程 locale 作为 fallback，改善非浏览器环境的语言识别
+- 禁用更新器差量下载，避免下载不完整问题
+- ChatArea 滚动按钮在面板展开时隐藏，min-h-0 修复 flex 溢出
+
+---
+
 ## [1.0.6] - 2026-05-29
 
 ### Fixed
@@ -148,6 +162,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - 项目需求文档 (REQUIREMENTS.md)
 - 项目结构初始化
 
+[1.0.7]: https://gitlab.weibo.cn/ailab/buddy-macos/-/tags/v1.0.7
 [1.0.6]: https://gitlab.weibo.cn/ailab/buddy-macos/-/tags/v1.0.6
 [1.0.5]: https://gitlab.weibo.cn/ailab/buddy-macos/-/tags/v1.0.5
 [1.0.4]: https://gitlab.weibo.cn/ailab/buddy-macos/-/tags/v1.0.4
