@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.5] - 2026-05-29
+
+### Changed
+
+- 更新项目标题、Slogan 和安装说明 (docs: readme)
+
+---
+
 ## [1.0.4] - 2026-05-29
 
 ### Added
@@ -125,6 +133,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - 项目需求文档 (REQUIREMENTS.md)
 - 项目结构初始化
 
+[1.0.5]: https://gitlab.weibo.cn/ailab/buddy-macos/-/tags/v1.0.5
 [1.0.4]: https://gitlab.weibo.cn/ailab/buddy-macos/-/tags/v1.0.4
 [1.0.3]: https://gitlab.weibo.cn/ailab/buddy-macos/-/tags/v1.0.3
 [1.0.0]: https://gitlab.weibo.cn/ailab/buddy-macos/-/tags/v1.0.0
