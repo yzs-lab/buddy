@@ -318,8 +318,23 @@ export class BuddyStore {
     let durationMs: number | undefined
     let costUsd: number | undefined
     let model: string | undefined
+    let firstTs: number | undefined
+    let lastTs: number | undefined
 
     for (const event of parseJsonlBuffer(raw)) {
+      // Track timestamps for duration calculation
+      const ts = event.timestamp ?? event.ts
+      if (typeof ts === 'number') {
+        if (firstTs == null || ts < firstTs) firstTs = ts
+        if (lastTs == null || ts > lastTs) lastTs = ts
+      } else if (typeof ts === 'string') {
+        const ms = new Date(ts).getTime()
+        if (!Number.isNaN(ms)) {
+          if (firstTs == null || ms < firstTs) firstTs = ms
+          if (lastTs == null || ms > lastTs) lastTs = ms
+        }
+      }
+
       // Claude stream-json format
       if (event.type === 'system' && event.subtype === 'init') {
         model = event.model as string | undefined
@@ -387,6 +402,17 @@ export class BuddyStore {
           events.push({ type: 'tool_use', toolName: (tc.function ?? tc.name) as string | undefined, toolInput: tc.arguments as Record<string, unknown> | undefined })
         }
       }
+      // Kimi/OpenAI-compatible: usage and model in final response
+      if (event.usage && typeof event.usage === 'object') {
+        const u = event.usage as Record<string, unknown>
+        if (u.input_tokens != null) inputTokens = (u.input_tokens as number) ?? inputTokens
+        if (u.prompt_tokens != null) inputTokens = (u.prompt_tokens as number) ?? inputTokens
+        if (u.output_tokens != null) outputTokens = (u.output_tokens as number) ?? outputTokens
+        if (u.completion_tokens != null) outputTokens = (u.completion_tokens as number) ?? outputTokens
+      }
+      if (event.model && typeof event.model === 'string' && !model) {
+        model = event.model as string
+      }
 
       // OpenCode format: tool_use events with part.tool, input in part.state.input
       if (event.type === 'tool_use') {
@@ -410,7 +436,7 @@ export class BuddyStore {
         const t = part?.text as string | undefined
         if (t) events.push({ type: 'text', text: t })
       }
-      // OpenCode step_finish: tokens in part.tokens, cost in part.cost
+      // OpenCode step_finish: tokens in part.tokens, cost in part.cost, model in part.respondedModelID
       if (event.type === 'step_finish') {
         const part = objectValue(event.part)
         const tokens = objectValue(part?.tokens)
@@ -420,6 +446,8 @@ export class BuddyStore {
           outputTokens = (tokens.output as number) ?? outputTokens
         }
         if (part?.cost != null) costUsd = part.cost as number
+        if (part?.respondedModelID) model = part.respondedModelID as string
+        else if (part?.requestedModelID) model = part.requestedModelID as string
       }
 
       // Generic: item.text
@@ -427,6 +455,11 @@ export class BuddyStore {
         const itemText = (event.item as Record<string, unknown>).text as string | undefined
         if (itemText) events.push({ type: 'text', text: itemText })
       }
+    }
+
+    // Fallback: compute duration from event timestamps if not provided by actor
+    if (durationMs == null && firstTs != null && lastTs != null && lastTs > firstTs) {
+      durationMs = lastTs - firstTs
     }
 
     return { runId, events, inputTokens, outputTokens, durationMs, costUsd, model }
