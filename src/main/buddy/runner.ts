@@ -321,7 +321,8 @@ export class BuddyRunner {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       const stderrText = stderrLines.join('\n').trim()
-      return { success: false, error: (stderrText || message).slice(0, 300) }
+      const isOnlyWarning = stderrText && isCliWarningOnly(stderrText)
+      return { success: false, error: (message || (!isOnlyWarning ? stderrText : 'Actor exited without producing any output')).slice(0, 300) }
     }
   }
 
@@ -614,7 +615,10 @@ export class BuddyRunner {
         try {
           const obj = JSON.parse(line)
           // Filter out system/hook noise events
-          return !(obj.type === 'system' && typeof obj.subtype === 'string' && (obj.subtype as string).startsWith('hook_'))
+          if (obj.type === 'system' && typeof obj.subtype === 'string' && (obj.subtype as string).startsWith('hook_')) return false
+          // Filter out other system events that carry no actor content (e.g. init, warning)
+          if (obj.type === 'system' && obj.subtype !== undefined) return false
+          return true
         } catch {
           return true // keep non-JSON lines
         }
@@ -635,7 +639,11 @@ export class BuddyRunner {
       await this.completeActor(taskId, workspaceKey, actor, runId, outputText, parsedLines, elapsedMs, result.exitCode ?? 0)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      const failureMessage = stderrLines.join('\n') || message
+      // Prefer the actual error message over stderr; only use stderr as fallback
+      // and filter out known CLI warnings that are not real errors
+      const stderrText = stderrLines.join('\n').trim()
+      const isOnlyWarning = stderrText && isCliWarningOnly(stderrText)
+      const failureMessage = message || (!isOnlyWarning ? stderrText : 'Actor exited without producing any output')
       await this.markFailed(taskId, workspaceKey, actor, failureMessage, runId)
       throw error
     } finally {
@@ -986,6 +994,21 @@ function normalizeActorRole(actor: string): TranscriptEntry['role'] {
 function lastValue(values: Array<string | undefined>): string | undefined {
   const filtered = values.filter(Boolean)
   return filtered[filtered.length - 1]
+}
+
+/** Check if stderr text contains only known CLI warnings (not real errors) */
+function isCliWarningOnly(stderrText: string): boolean {
+  // Known CLI warnings that should not be treated as errors
+  const warningPatterns = [
+    /Running with --dangerously-skip-permissions/i,
+    /Warning:.*skip.*permission/i,
+    /bypass.*approval/i,
+    /bypass.*sandbox/i
+  ]
+  const lines = stderrText.split(/\r?\n/).filter((l) => l.trim())
+  return lines.length > 0 && lines.every((line) =>
+    warningPatterns.some((p) => p.test(line))
+  )
 }
 
 async function existingCwd(path?: string): Promise<string> {
