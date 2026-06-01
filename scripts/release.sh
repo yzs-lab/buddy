@@ -161,17 +161,21 @@ echo "   Upload complete ✓"
 
 # --- 8. Create or update GitLab Release ---
 echo ">> Creating GitLab Release..."
+
+# Web-accessible package download URLs (avoids %2F encoding issues with API URLs)
+PKG_URL_BASE="https://${GITLAB_HOST}/${PROJECT_PATH}/-/packages/generic/${PACKAGE_NAME}/${PACKAGE_VERSION}"
 ASSETS_LINKS="$(cat <<EOF
 [
-  {"name":"macOS DMG (arm64)","url":"${API_BASE}/projects/${PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${PACKAGE_VERSION}/Buddy-${PACKAGE_VERSION}-arm64.dmg","link_type":"package"},
-  {"name":"macOS DMG (x64)","url":"${API_BASE}/projects/${PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${PACKAGE_VERSION}/Buddy-${PACKAGE_VERSION}.dmg","link_type":"package"},
-  {"name":"macOS ZIP (arm64)","url":"${API_BASE}/projects/${PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${PACKAGE_VERSION}/Buddy-${PACKAGE_VERSION}-arm64-mac.zip","link_type":"package"},
-  {"name":"macOS ZIP (x64)","url":"${API_BASE}/projects/${PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${PACKAGE_VERSION}/Buddy-${PACKAGE_VERSION}-mac.zip","link_type":"package"},
-  {"name":"Source (.tar.gz)","url":"${API_BASE}/projects/${PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${PACKAGE_VERSION}/buddy-macos-${VERSION}-source.tar.gz","link_type":"package"},
-  {"name":"Source (.zip)","url":"${API_BASE}/projects/${PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${PACKAGE_VERSION}/buddy-macos-${VERSION}-source.zip","link_type":"package"}
+  {"name":"macOS DMG (arm64)","url":"${PKG_URL_BASE}/Buddy-${PACKAGE_VERSION}-arm64.dmg","link_type":"package"},
+  {"name":"macOS DMG (x64)","url":"${PKG_URL_BASE}/Buddy-${PACKAGE_VERSION}.dmg","link_type":"package"},
+  {"name":"macOS ZIP (arm64)","url":"${PKG_URL_BASE}/Buddy-${PACKAGE_VERSION}-arm64-mac.zip","link_type":"package"},
+  {"name":"macOS ZIP (x64)","url":"${PKG_URL_BASE}/Buddy-${PACKAGE_VERSION}-mac.zip","link_type":"package"},
+  {"name":"Source (.tar.gz)","url":"${PKG_URL_BASE}/buddy-macos-${VERSION}-source.tar.gz","link_type":"package"},
+  {"name":"Source (.zip)","url":"${PKG_URL_BASE}/buddy-macos-${VERSION}-source.zip","link_type":"package"}
 ]
 EOF
 )"
+
 if glab release view "$VERSION" >/dev/null 2>&1; then
   echo "   Release already exists, updating assets only..."
   # Delete existing asset links first to avoid name conflicts on re-creation
@@ -182,24 +186,22 @@ if glab release view "$VERSION" >/dev/null 2>&1; then
   "); do
     glab api --method DELETE "/projects/${PROJECT_ID}/releases/${VERSION}/assets/links/${link_id}" >/dev/null 2>&1 || true
   done
-  # Recreate all asset links
-  for link in $(echo "$ASSETS_LINKS" | node -e "
-    const links=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
-    links.forEach((l,i)=>console.log(i+'|'+l.name+'|'+l.url));
-  "); do
-    link_name="$(echo "$link" | cut -d'|' -f2)"
-    link_url="$(echo "$link" | cut -d'|' -f3-)"
-    glab api --method POST "/projects/${PROJECT_ID}/releases/${VERSION}/assets/links" \
-      -f "name=$link_name" -f "url=$link_url" -f "link_type=package" \
-      || { echo "   WARNING: Failed to create asset link: $link_name" >&2; true; }
-  done
 else
   glab release create "$VERSION" \
     --name "Buddy ${VERSION}" \
     --notes "Release ${VERSION}" \
-    --assets-links "$ASSETS_LINKS" \
     || echo "   Release creation issue, continuing ✓"
 fi
+
+# Create asset links via API (tab-delimited parsing avoids word-splitting bugs with names containing spaces)
+echo "$ASSETS_LINKS" | node -e "
+  const links=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
+  links.forEach(l => process.stdout.write(l.name + '\\t' + l.url + '\\n'));
+" | while IFS=$'\t' read -r link_name link_url; do
+  glab api --method POST "/projects/${PROJECT_ID}/releases/${VERSION}/assets/links" \
+    -f "name=${link_name}" -f "url=${link_url}" -f "link_type=package" \
+    || { echo "   WARNING: Failed to create asset link: ${link_name}" >&2; true; }
+done
 echo "   Release ready ✓"
 
 # --- 9. Deploy to update server ---
