@@ -174,6 +174,15 @@ EOF
 )"
 if glab release view "$VERSION" >/dev/null 2>&1; then
   echo "   Release already exists, updating assets only..."
+  # Delete existing asset links first to avoid name conflicts on re-creation
+  existing_links="$(glab api "/projects/${PROJECT_ID}/releases/${VERSION}/assets/links" 2>/dev/null || echo '[]')"
+  for link_id in $(echo "$existing_links" | node -e "
+    const links=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
+    links.forEach(l=>console.log(l.id));
+  "); do
+    glab api --method DELETE "/projects/${PROJECT_ID}/releases/${VERSION}/assets/links/${link_id}" >/dev/null 2>&1 || true
+  done
+  # Recreate all asset links
   for link in $(echo "$ASSETS_LINKS" | node -e "
     const links=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
     links.forEach((l,i)=>console.log(i+'|'+l.name+'|'+l.url));
@@ -181,10 +190,8 @@ if glab release view "$VERSION" >/dev/null 2>&1; then
     link_name="$(echo "$link" | cut -d'|' -f2)"
     link_url="$(echo "$link" | cut -d'|' -f3-)"
     glab api --method POST "/projects/${PROJECT_ID}/releases/${VERSION}/assets/links" \
-      -f "name=$link_name" -f "url=$link_url" -f "link_type=package" >/dev/null 2>&1 \
-      || glab api --method PUT "/projects/${PROJECT_ID}/releases/${VERSION}/assets/links" \
-        -f "name=$link_name" -f "url=$link_url" -f "link_type=package" >/dev/null 2>&1 \
-        || true
+      -f "name=$link_name" -f "url=$link_url" -f "link_type=package" \
+      || { echo "   WARNING: Failed to create asset link: $link_name" >&2; true; }
   done
 else
   glab release create "$VERSION" \
