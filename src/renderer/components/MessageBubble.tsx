@@ -255,18 +255,18 @@ export function MessageBubble({ entry, taskId, workspaceKey }: MessageBubbleProp
           dangerouslySetInnerHTML={{ __html: html }}
         />
         {runId && !isHuman && !isSystem && taskId && workspaceKey && (
-          <RoundEvents taskId={taskId} runId={runId} workspaceKey={workspaceKey} />
+          <RoundEvents taskId={taskId} runId={runId} workspaceKey={workspaceKey} actor={entry.role} />
         )}
       </div>
     </div>
   )
 }
 
-function RoundEvents({ taskId, runId, workspaceKey }: { taskId: string; runId: string; workspaceKey: string }) {
+function RoundEvents({ taskId, runId, workspaceKey, actor }: { taskId: string; runId: string; workspaceKey: string; actor: string }) {
   const t = useT()
   const lang = useLanguage()
   const [expanded, setExpanded] = useState(false)
-  const { data, isLoading } = useRoundEvents(taskId, runId, workspaceKey)
+  const { data, isLoading } = useRoundEvents(taskId, runId, workspaceKey, actor)
 
   // No data or empty events + no stats → hide the button entirely
   if (!data && !isLoading) return null

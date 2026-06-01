@@ -1,0 +1,99 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { mkdir, writeFile, rm } from 'node:fs/promises'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
+
+const tempHome = join(tmpdir(), `buddy-test-model-detect-${process.pid}`)
+
+vi.mock('node:os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:os')>()
+  return {
+    ...actual,
+    homedir: () => tempHome
+  }
+})
+
+describe('model-detect', () => {
+  beforeEach(async () => {
+    await mkdir(tempHome, { recursive: true })
+  })
+
+  afterEach(async () => {
+    await rm(tempHome, { recursive: true, force: true })
+  })
+
+  it('reads model from opencode JSON config', async () => {
+    const configDir = join(tempHome, '.config', 'opencode')
+    await mkdir(configDir, { recursive: true })
+    await writeFile(join(configDir, 'opencode.json'), JSON.stringify({
+      model: 'wecode/ali-deepseek-v4-pro',
+      provider: {}
+    }))
+
+    const { detectModelFromConfig } = await import('../../../src/main/buddy/model-detect')
+    const model = await detectModelFromConfig('opencode')
+    expect(model).toBe('wecode/ali-deepseek-v4-pro')
+  })
+
+  it('reads model from codex TOML config (quoted value)', async () => {
+    const configDir = join(tempHome, '.codex')
+    await mkdir(configDir, { recursive: true })
+    await writeFile(join(configDir, 'config.toml'), [
+      'model_provider = "cpa"',
+      'model = "gpt-5.5"',
+      'disable_response_storage = true',
+      '',
+      '[model_providers.cpa]',
+      'name = "wecode openai"'
+    ].join('\n'))
+
+    const { detectModelFromConfig } = await import('../../../src/main/buddy/model-detect')
+    const model = await detectModelFromConfig('codex')
+    expect(model).toBe('gpt-5.5')
+  })
+
+  it('reads default_model from kimi TOML config', async () => {
+    const configDir = join(tempHome, '.kimi')
+    await mkdir(configDir, { recursive: true })
+    await writeFile(join(configDir, 'config.toml'), [
+      'default_model = "kimi-latest"',
+      'default_thinking = false',
+      'default_yolo = false'
+    ].join('\n'))
+
+    const { detectModelFromConfig } = await import('../../../src/main/buddy/model-detect')
+    const model = await detectModelFromConfig('kimi')
+    expect(model).toBe('kimi-latest')
+  })
+
+  it('returns undefined for unknown actor', async () => {
+    const { detectModelFromConfig } = await import('../../../src/main/buddy/model-detect')
+    const model = await detectModelFromConfig('unknown_actor')
+    expect(model).toBeUndefined()
+  })
+
+  it('returns undefined when config file does not exist', async () => {
+    const { detectModelFromConfig } = await import('../../../src/main/buddy/model-detect')
+    const model = await detectModelFromConfig('opencode')
+    expect(model).toBeUndefined()
+  })
+
+  it('returns undefined when model field is empty string', async () => {
+    const configDir = join(tempHome, '.kimi')
+    await mkdir(configDir, { recursive: true })
+    await writeFile(join(configDir, 'config.toml'), [
+      'default_model = ""',
+      'default_thinking = false'
+    ].join('\n'))
+
+    const { detectModelFromConfig } = await import('../../../src/main/buddy/model-detect')
+    const model = await detectModelFromConfig('kimi')
+    expect(model).toBeUndefined()
+  })
+
+  it('returns undefined for claude (no config fallback needed)', async () => {
+    const { detectModelFromConfig } = await import('../../../src/main/buddy/model-detect')
+    const model = await detectModelFromConfig('claude')
+    expect(model).toBeUndefined()
+  })
+})

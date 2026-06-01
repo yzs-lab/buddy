@@ -28,6 +28,7 @@ import type {
 import { normalizeGlobalSettings, normalizeLaunchers } from '../../shared/defaults'
 import { canonicalRepoRoot, createBuddyPaths, taskDir, workspaceKeyForRepo } from './paths'
 import { redactJsonValue } from './redact'
+import { detectModelFromConfig } from './model-detect'
 import { parseJsonlBuffer } from './parsers'
 import { parseEventLine, parseGlobalSettings, parseTaskSettings, parseTaskState } from './schemas'
 
@@ -306,7 +307,7 @@ export class BuddyStore {
     return join(this.taskDirectory(taskId, workspaceKey), 'transcript.jsonl')
   }
 
-  async getRoundEvents(taskId: string, runId: string, workspaceKey: string): Promise<RoundEventSummary | null> {
+  async getRoundEvents(taskId: string, runId: string, workspaceKey: string, actor?: string): Promise<RoundEventSummary | null> {
     const dir = this.taskDirectory(taskId, workspaceKey)
     const eventsPath = join(dir, 'artifacts', `${runId}-events.jsonl`)
     const raw = await readOptionalText(eventsPath)
@@ -460,6 +461,11 @@ export class BuddyStore {
     // Fallback: compute duration from event timestamps if not provided by actor
     if (durationMs == null && firstTs != null && lastTs != null && lastTs > firstTs) {
       durationMs = lastTs - firstTs
+    }
+
+    // Fallback: detect model from actor config file when not available in streaming output
+    if (!model && actor) {
+      model = await detectModelFromConfig(actor)
     }
 
     return { runId, events, inputTokens, outputTokens, durationMs, costUsd, model }

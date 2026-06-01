@@ -127,9 +127,9 @@ export class BuddyCoreService {
     return this.store.getEvents(taskId, since, workspaceKey)
   }
 
-  getRoundEvents(taskId: string, runId: string, workspaceKey?: string): Promise<RoundEventSummary | null> {
+  getRoundEvents(taskId: string, runId: string, workspaceKey?: string, actor?: string): Promise<RoundEventSummary | null> {
     if (!workspaceKey) throw new Error('workspaceKey is required')
-    return this.store.getRoundEvents(taskId, runId, workspaceKey)
+    return this.store.getRoundEvents(taskId, runId, workspaceKey, actor)
   }
 
   updateGlobalSettings(settings: GlobalSettings): Promise<GlobalSettings> {

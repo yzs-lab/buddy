@@ -249,10 +249,10 @@ export function useGitCommitAndPush() {
   })
 }
 
-export function useRoundEvents(taskId: string | null, runId: string | null, workspaceKey?: string) {
+export function useRoundEvents(taskId: string | null, runId: string | null, workspaceKey?: string, actor?: string) {
   return useQuery({
-    queryKey: ['roundEvents', taskId, runId],
-    queryFn: () => api.getRoundEvents(taskId!, runId!, workspaceKey),
+    queryKey: ['roundEvents', taskId, runId, actor],
+    queryFn: () => api.getRoundEvents(taskId!, runId!, workspaceKey, actor),
     enabled: !!taskId && !!runId,
     staleTime: Infinity
   })

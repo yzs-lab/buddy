@@ -26,7 +26,7 @@ export interface BuddyHandlerService {
   clearInstructionQueue(taskId: string, workspaceKey: string): Promise<void>
   interruptAndInsert(taskId: string, workspaceKey: string, queueItemId: string): Promise<void>
   getEvents(taskId: string, since: number, workspaceKey?: string): Promise<unknown>
-  getRoundEvents(taskId: string, runId: string, workspaceKey?: string): Promise<RoundEventSummary | null>
+  getRoundEvents(taskId: string, runId: string, workspaceKey?: string, actor?: string): Promise<RoundEventSummary | null>
   updateGlobalSettings(settings: GlobalSettings): Promise<unknown>
   gitStatus(repoRoot: string): Promise<unknown>
   gitStageAll(repoRoot: string): Promise<void>
@@ -80,8 +80,8 @@ export function registerBuddyHandlers(ipcMain: IpcHandle, service: BuddyHandlerS
   ipcMain.handle('buddy:getEvents', (_event, taskId: string, since: number, workspaceKey?: string) =>
     service.getEvents(taskId, since, workspaceKey)
   )
-  ipcMain.handle('buddy:getRoundEvents', (_event, taskId: string, runId: string, workspaceKey?: string) =>
-    service.getRoundEvents(taskId, runId, workspaceKey)
+  ipcMain.handle('buddy:getRoundEvents', (_event, taskId: string, runId: string, workspaceKey?: string, actor?: string) =>
+    service.getRoundEvents(taskId, runId, workspaceKey, actor)
   )
   ipcMain.handle('buddy:updateGlobalSettings', (_event, settings: GlobalSettings) =>
     service.updateGlobalSettings(settings)

@@ -47,8 +47,8 @@ export const api = {
     buddy().interruptAndInsert(taskId, workspaceKey, queueItemId),
   getEvents: (taskId: string, since: number, workspaceKey?: string) =>
     buddy().getEvents(taskId, since, workspaceKey),
-  getRoundEvents: (taskId: string, runId: string, workspaceKey?: string) =>
-    buddy().getRoundEvents(taskId, runId, workspaceKey) as Promise<RoundEventSummary | null>,
+  getRoundEvents: (taskId: string, runId: string, workspaceKey?: string, actor?: string) =>
+    buddy().getRoundEvents(taskId, runId, workspaceKey, actor) as Promise<RoundEventSummary | null>,
   updateGlobalSettings: (settings: GlobalSettings) =>
     buddy().updateGlobalSettings(settings),
   gitStatus: (repoRoot: string) =>

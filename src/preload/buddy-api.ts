@@ -57,8 +57,8 @@ export function createBuddyPreloadApi(ipc: IpcLike) {
       ipc.invoke('buddy:interruptAndInsert', taskId, workspaceKey, queueItemId) as Promise<void>,
     getEvents: (taskId: string, since: number, workspaceKey?: string): Promise<{ events: Event[] }> =>
       ipc.invoke('buddy:getEvents', taskId, since, workspaceKey) as Promise<{ events: Event[] }>,
-    getRoundEvents: (taskId: string, runId: string, workspaceKey?: string): Promise<RoundEventSummary | null> =>
-      ipc.invoke('buddy:getRoundEvents', taskId, runId, workspaceKey) as Promise<RoundEventSummary | null>,
+    getRoundEvents: (taskId: string, runId: string, workspaceKey?: string, actor?: string): Promise<RoundEventSummary | null> =>
+      ipc.invoke('buddy:getRoundEvents', taskId, runId, workspaceKey, actor) as Promise<RoundEventSummary | null>,
     updateGlobalSettings: (settings: GlobalSettings): Promise<GlobalSettings> =>
       ipc.invoke('buddy:updateGlobalSettings', settings) as Promise<GlobalSettings>,
     gitStatus: (repoRoot: string): Promise<unknown> =>
