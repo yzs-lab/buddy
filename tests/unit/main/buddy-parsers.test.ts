@@ -73,6 +73,37 @@ describe('buddy actor parsers', () => {
     expect(reasoning).toBe('')
   })
 
+  it('extracts buddy messages from OpenCode tool_use output (echo commands)', () => {
+    const output = extractActorOutput('opencode', [
+      JSON.stringify({ type: 'text', sessionID: 's1', part: { type: 'text', text: 'Task done.' } }),
+      JSON.stringify({ type: 'tool_use', sessionID: 's1', part: { type: 'tool', tool: 'bash', callID: 'c1', state: { status: 'completed', input: { command: "echo '{\"type\": \"break\", \"content\": \"All done.\"}'" }, output: '{"type": "break", "content": "All done."}' } } }),
+    ].join('\n'))
+    const message = parseBuddyMessage(output)
+
+    expect(message).toEqual({ kind: 'break', content: 'All done.' })
+  })
+
+  it('extracts buddy messages from OpenCode tool_use when text events have no buddy JSON', () => {
+    const output = extractActorOutput('opencode', [
+      JSON.stringify({ type: 'text', sessionID: 's1', part: { type: 'text', text: 'I will signal completion.' } }),
+      JSON.stringify({ type: 'tool_use', sessionID: 's1', part: { type: 'tool', tool: 'bash', callID: 'c1', state: { status: 'completed', input: { command: "echo hi" }, output: '{"type": "break", "content": "Done."}' } } }),
+      JSON.stringify({ type: 'text', sessionID: 's1', part: { type: 'text', text: 'Echo command executed.' } }),
+    ].join('\n'))
+    const message = parseBuddyMessage(output)
+
+    expect(message.kind).toBe('break')
+  })
+
+  it('streams buddy messages from OpenCode tool_use events', () => {
+    const event = parseActorLine('opencode', JSON.stringify({
+      type: 'tool_use',
+      sessionID: 's1',
+      part: { type: 'tool', tool: 'bash', callID: 'c1', state: { status: 'completed', input: { command: "echo break" }, output: '{"type": "break", "content": "Done."}' } }
+    }))
+
+    expect(event.text).toContain('"type": "break"')
+  })
+
   it('keeps OpenCode JSON chunks adjacent when extracting output', () => {
     const output = extractActorOutput('opencode', [
       JSON.stringify({ type: 'text', sessionID: 's1', part: { type: 'text', text: '{"type":"ch' } }),

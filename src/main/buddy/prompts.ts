@@ -23,6 +23,7 @@ Your output is parsed by the buddy orchestrator. Wrap your response in the follo
 
 Rules:
 - Always output valid JSON matching this structure.
+- Output the JSON as your **final text response** - do NOT use shell commands (echo, printf, etc.) to output it. The orchestrator reads your text output, not command output.
 - Output raw JSON only - do NOT wrap it in a Markdown code block, and do NOT add any text before or after the JSON.
 - Avoid unescaped double quotes inside \`content\`; use single quotes or escape them.
 - Use \`type=break\` when: the task is fully completed, you are blocked and need human input, continuing would be counterproductive, or the other actor has failed repeatedly on the same issue across multiple rounds without meaningful progress.
@@ -98,7 +99,9 @@ export function buildActorPrompt(input: BuildActorPromptInput): string {
       `${requesterLabel} has signaled \`type=break\` and believes the task is complete.`,
       'You must decide:',
       '- If you also agree the task is complete, respond with `type=break` to confirm. The task will then end.',
-      '- If you think work should continue, respond with `type=chat` and describe what still needs to be done. The break request will be withdrawn.'
+      '- If you think work should continue, respond with `type=chat` and describe what still needs to be done. The break request will be withdrawn.',
+      '',
+      '**Important**: This is a priority decision. Do NOT start new work or investigate new questions. Either confirm the break or reject it with a specific reason.'
     )
   }
 

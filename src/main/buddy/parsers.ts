@@ -94,8 +94,14 @@ export function parseOpenCodeJsonLine(line: string): ParsedActorLine {
     const toolName = part?.tool ?? 'tool'
     const state = objectValue(part?.state)
     const input = state?.input ?? part?.input
-    const detail = openCodeToolDetail(toolName, input)
-    text = detail ? `🔧 ${toolName} ${detail}` : `🔧 ${toolName}`
+    const output = textValue(state?.output)
+    // If tool output contains a buddy message, show it directly (e.g. echo commands)
+    if (output && BUDDY_JSON_PATTERN.test(output)) {
+      text = output.trim()
+    } else {
+      const detail = openCodeToolDetail(toolName, input)
+      text = detail ? `🔧 ${toolName} ${detail}` : `🔧 ${toolName}`
+    }
   }
 
   return {
@@ -121,8 +127,13 @@ export function parseKimiJSONLine(line: string): ParsedActorLine {
     const toolName = typeof part?.tool === 'string' ? part.tool : 'tool'
     const state = objectValue(part?.state)
     const input: unknown = state?.input ?? part?.input
-    const detail = kimiToolDetail(toolName, input)
-    text = detail ? `🔧 ${toolName} ${detail}` : `🔧 ${toolName}`
+    const output = textValue(state?.output)
+    if (output && BUDDY_JSON_PATTERN.test(output)) {
+      text = output.trim()
+    } else {
+      const detail = kimiToolDetail(toolName, input)
+      text = detail ? `🔧 ${toolName} ${detail}` : `🔧 ${toolName}`
+    }
   } else if (json.role === 'assistant') {
     // Legacy OpenAI-compatible format
     text = textValue(json.content)
@@ -365,6 +376,8 @@ function extractClaudeOutput(rawEvents: string): string {
   return (result || chunks.join('\n')).trim()
 }
 
+const BUDDY_JSON_PATTERN = /\{\s*"type"\s*:\s*"(chat|break)"/
+
 function extractOpenCodeOutput(rawEvents: string): string {
   const chunks: string[] = []
   for (const event of parseJsonEvents(rawEvents)) {
@@ -375,6 +388,15 @@ function extractOpenCodeOutput(rawEvents: string): string {
     } else if (event.type === 'error') {
       const error = stringifyValue(event.error)
       if (error) chunks.push(error)
+    } else if (event.type === 'tool_use') {
+      // Some models (e.g. DeepSeek) output buddy JSON via echo/bash commands.
+      // The buddy message appears in part.state.output of tool_use events.
+      const part = objectValue(event.part)
+      const state = objectValue(part?.state)
+      const output = textValue(state?.output)
+      if (output && BUDDY_JSON_PATTERN.test(output)) {
+        chunks.push('\n' + output.trim())
+      }
     }
   }
   return chunks.join('').trim()
@@ -392,6 +414,13 @@ function extractKimiOutput(rawEvents: string): string {
     } else if (event.type === 'error') {
       const error = stringifyValue(event.error)
       if (error) chunks.push(error)
+    } else if (event.type === 'tool_use') {
+      const part = objectValue(event.part)
+      const state = objectValue(part?.state)
+      const output = textValue(state?.output)
+      if (output && BUDDY_JSON_PATTERN.test(output)) {
+        chunks.push('\n' + output.trim())
+      }
     } else if (event.role === 'assistant') {
       // Legacy OpenAI-compatible format: each event is a full message, keep last
       const content = textValue(event.content)

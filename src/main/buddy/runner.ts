@@ -14,7 +14,7 @@ import type {
 } from '../../shared/types'
 import { buildLauncherCommand, commandKindFor, runLauncher, type LauncherCommandKind } from './launchers'
 import { createRunLock, removeRunLock } from './locks'
-import { extractActorOutput, parseActorEvents, parseActorLine, parseBuddyMessage, ParsedActorLine } from './parsers'
+import { extractActorOutput, parseActorEvents, parseActorLine, parseBuddyMessage, parseJsonlBuffer, ParsedActorLine } from './parsers'
 import { buildActorPrompt, buildPingPrompt, hashText, nextActor as nextActorForSettings, implementerActor as resolveImplementerActor, actorDisplayName } from './prompts'
 import { BuddyStore } from './store'
 import { BuddyEventBus } from './events'
@@ -1059,8 +1059,42 @@ async function collectOutputText(
   stdoutText: string
 ): Promise<string> {
   if (kind === 'native_claude' || kind === 'native_opencode' || kind === 'native_kimi') {
-    const output = extractActorOutput(actor, stdoutText)
-    const message = parseBuddyMessage(output)
+    let output = extractActorOutput(actor, stdoutText)
+    let message = parseBuddyMessage(output)
+
+    // Fallback: some models (e.g. DeepSeek via OpenCode/Kimi) output buddy JSON
+    // via echo/bash commands. The buddy message appears in part.state.output
+    // of tool_use events. extractActorOutput may miss it if the text events
+    // contain preamble that masks the break signal.
+    if (message.kind !== 'break' && (kind === 'native_opencode' || kind === 'native_kimi')) {
+      for (const event of parseJsonlBuffer(stdoutText)) {
+        if (event.type === 'tool_use') {
+          const part = event.part
+          if (part && typeof part === 'object' && !Array.isArray(part)) {
+            const state = (part as Record<string, unknown>).state
+            if (state && typeof state === 'object' && !Array.isArray(state)) {
+              const toolOutput = typeof (state as Record<string, unknown>).output === 'string'
+                ? (state as Record<string, unknown>).output as string
+                : undefined
+              if (toolOutput) {
+                const toolMessage = parseBuddyMessage(toolOutput.trim())
+                if (toolMessage.kind === 'break') {
+                  message = toolMessage
+                  break
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // If break was found in tool output but not in extracted text, prepend it
+    // so completeActor's parseBuddyMessage call detects it (it finds the first match)
+    if (message.kind === 'break' && parseBuddyMessage(output).kind !== 'break') {
+      output = JSON.stringify({ type: 'break', content: message.content }) + '\n' + output
+    }
+
     const normalized = JSON.stringify({
       type: message.kind === 'break' ? 'break' : 'chat',
       content: message.kind === 'break' ? (message.content ?? message.reason ?? '') : (message.text ?? '')
