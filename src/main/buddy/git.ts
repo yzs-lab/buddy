@@ -263,13 +263,17 @@ ${diffSummary}`
     child.stderr!.on('data', (c: Buffer) => errChunks.push(c))
     child.stdin!.end(prompt)
 
+    const GENERATE_COMMIT_TIMEOUT_MS = 120_000
+    let timedOut = false
     const timeout = setTimeout(() => {
+      timedOut = true
       child.kill('SIGTERM')
       resolve('')
-    }, 30000)
+    }, GENERATE_COMMIT_TIMEOUT_MS)
 
     once(child, 'exit').then(() => {
       clearTimeout(timeout)
+      if (timedOut) return
       const raw = Buffer.concat(chunks).toString('utf8').trim()
       const match = raw.match(/```\w*\n?([\s\S]*?)\n?```$/)
       const text = (match ? match[1] : raw).trim()
