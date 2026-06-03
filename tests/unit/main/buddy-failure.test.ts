@@ -143,7 +143,7 @@ process.exit(0);
     })
     await store.updateTaskState('demo', created.workspace_key, (state) => ({
       ...state,
-      consecutive_failures: 2,
+      consecutive_failures: 9,
       status: 'FAILED',
       active_run: null,
       latest_failure: { actor: 'codex', message: 'previous fail', ts: new Date().toISOString() }
@@ -158,7 +158,7 @@ process.exit(0);
 
     const detail = await store.getTaskDetail('demo', created.workspace_key)
     expect(detail.state.status).toBe('PAUSED')
-    expect(detail.state.consecutive_failures).toBe(3)
+    expect(detail.state.consecutive_failures).toBe(10)
     const thresholdEvent = detail.events.find((e) => e.type === 'failure_threshold.reached')
     expect(thresholdEvent).toBeDefined()
   })

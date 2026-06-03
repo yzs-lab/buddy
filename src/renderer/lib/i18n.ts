@@ -174,6 +174,8 @@ const en = {
   'settings.collab.maxRounds.desc': 'Maximum collaboration rounds per session (-1 = unlimited)',
   'settings.collab.timeout.title': 'Round timeout (seconds)',
   'settings.collab.timeout.desc': 'Maximum execution time per round for each actor, shared across all actors',
+  'settings.collab.maxFailures.title': 'Max consecutive failures',
+  'settings.collab.maxFailures.desc': 'Pause the task when consecutive failures reach this limit, shared across all actors',
 
   // Settings — Appearance
   'settings.appearance.theme.title': 'Theme',
@@ -519,6 +521,8 @@ const zhCN: typeof en = {
   'settings.collab.maxRounds.desc': '单个会话的最大协作轮数（-1 表示不限制）',
   'settings.collab.timeout.title': '单轮执行超时（秒）',
   'settings.collab.timeout.desc': '每个 AI 在单轮协作中的最长运行时间，超时后自动终止，所有 actor 共享此值',
+  'settings.collab.maxFailures.title': '连续失败上限',
+  'settings.collab.maxFailures.desc': '连续失败达到此上限时自动暂停任务，所有 actor 共享计数',
 
   'settings.appearance.theme.title': '主题',
   'settings.appearance.theme.desc': '选择应用的外观主题',
@@ -851,6 +855,8 @@ const zhTW: typeof en = {
   'settings.collab.maxRounds.desc': '單一會話的最大協作輪數（-1 表示不限制）',
   'settings.collab.timeout.title': '單輪執行逾時（秒）',
   'settings.collab.timeout.desc': '每個 AI 在單輪協作中的最長執行時間，逾時後自動終止，所有 actor 共用此值',
+  'settings.collab.maxFailures.title': '連續失敗上限',
+  'settings.collab.maxFailures.desc': '連續失敗達到此上限時自動暫停任務，所有 actor 共用計數',
 
   'settings.appearance.theme.title': '主題',
   'settings.appearance.theme.desc': '選擇應用的外觀主題',

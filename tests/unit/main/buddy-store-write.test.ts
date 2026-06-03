@@ -38,7 +38,7 @@ describe('BuddyStore writes', () => {
       protocol_version: '1',
       flow_policy: 'claude_then_codex',
       role_mode: 'claude_implements',
-      max_consecutive_failures: 3,
+      max_consecutive_failures: 10,
       seed_claude_session_id: '',
       seed_codex_thread_id: '',
       launchers: {

@@ -13,7 +13,7 @@ describe('BuddyStore settings and delete', () => {
       protocol_version: '1',
       countdown_seconds: 30,
       max_rounds: 9999,
-      max_consecutive_failures: 3,
+      max_consecutive_failures: 10,
       launchers: {
         claude: { command: 'claude', env: {}, timeout_seconds: 7200 },
         codex: { command: 'codex', env: {}, timeout_seconds: 7200 }

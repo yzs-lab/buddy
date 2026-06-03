@@ -918,7 +918,7 @@ export class BuddyRunner {
 
     const newConsecutiveFailures = (stateBefore.consecutive_failures ?? 0) + 1
     const globalSettings = await this.store.readGlobalSettings()
-    const maxConsecutiveFailures = globalSettings.max_consecutive_failures ?? 3
+    const maxConsecutiveFailures = globalSettings.max_consecutive_failures ?? 10
     const thresholdReached = newConsecutiveFailures >= maxConsecutiveFailures
 
     await this.store.updateTaskState(taskId, workspaceKey, (state) => ({

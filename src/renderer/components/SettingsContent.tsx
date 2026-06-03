@@ -321,6 +321,18 @@ function GeneralSettings({ globalSettings }: { globalSettings: GlobalSettings | 
               />
             }
           />
+          <SettingsRow
+            title={t('settings.collab.maxFailures.title')}
+            description={t('settings.collab.maxFailures.desc')}
+            right={
+              <EditableNumber
+                value={globalSettings?.max_consecutive_failures ?? 10}
+                min={1}
+                max={999}
+                onSave={(v) => save({ max_consecutive_failures: v })}
+              />
+            }
+          />
         </SettingsList>
       </div>
     </div>

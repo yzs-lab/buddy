@@ -730,7 +730,7 @@ function CreateTaskModal({
       role_mode: implementer === 'codex' ? 'codex_implements' : 'claude_implements',
       implementer_actor: implementer,
       reviewer_actor: reviewer,
-      max_consecutive_failures: normalizedGlobalSettings.max_consecutive_failures ?? 3,
+      max_consecutive_failures: normalizedGlobalSettings.max_consecutive_failures ?? 10,
       launchers: {
         claude: launcherFor('claude'),
         codex: launcherFor('codex'),

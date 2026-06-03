@@ -113,7 +113,7 @@ export const globalSettingsSchema = z.object({
   protocol_version: z.string().default('1'),
   countdown_seconds: z.number().default(30),
   max_rounds: z.number().default(9999),
-  max_consecutive_failures: z.number().default(3),
+    max_consecutive_failures: z.number().default(10),
   launchers: z.record(z.string(), launcherSchema).default({}),
   seed_claude_session_id: z.string().optional(),
   seed_codex_thread_id: z.string().optional()
