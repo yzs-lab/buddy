@@ -15,6 +15,30 @@ export function writeStringArraySetting(key: string, value: string[]) {
   } catch {}
 }
 
+// --- Task display names ---
+
+type TaskNames = Record<string, string> // taskId → custom display name
+
+export function readTaskNames(): TaskNames {
+  try {
+    if (typeof window === 'undefined') return {}
+    const parsed = JSON.parse(window.localStorage?.getItem('buddy.taskNames') || '{}')
+    return typeof parsed === 'object' && parsed !== null ? parsed : {}
+  } catch { return {} }
+}
+
+export function writeTaskNames(names: TaskNames) {
+  try {
+    if (typeof window === 'undefined') return
+    window.localStorage?.setItem('buddy.taskNames', JSON.stringify(names))
+  } catch {}
+}
+
+export function displayNameForTask(task: Task, taskNames?: TaskNames): string {
+  if (taskNames?.[task.task_id]) return taskNames[task.task_id]
+  return task.task_id
+}
+
 // --- Unread state ---
 
 type TaskReadState = Record<string, string> // taskId → ISO timestamp of last read

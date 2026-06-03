@@ -16,7 +16,7 @@ import { UpdateNotification } from './components/UpdateNotification'
 import { useUpdater } from './hooks/useUpdater'
 import { ACTOR_LABEL_KEY, Actor } from './lib/format'
 import { isTaskReadyToStart } from './lib/taskState'
-import { readStringArraySetting, visibleTasksForShortcuts, markTaskAsRead, readLastSelectedTask, saveLastSelectedTask, clearLastSelectedTask } from './lib/taskList'
+import { readStringArraySetting, visibleTasksForShortcuts, markTaskAsRead, readLastSelectedTask, saveLastSelectedTask, clearLastSelectedTask, readTaskNames, writeTaskNames } from './lib/taskList'
 import type { GlobalSettings, InstructionQueueItem, Attachment, AttachmentMeta } from '../shared/types'
 
 const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico'])
@@ -56,6 +56,7 @@ export default function App() {
       return JSON.parse(localStorage.getItem('buddy.projectNames') || '{}')
     } catch { return {} }
   })
+  const [taskNames, setTaskNames] = useState<Record<string, string>>(() => readTaskNames())
 
   useTheme()
   const updater = useUpdater()
@@ -171,6 +172,14 @@ export default function App() {
     setProjectNames(prev => {
       const next = { ...prev, [repoRoot]: newName }
       try { localStorage.setItem('buddy.projectNames', JSON.stringify(next)) } catch {}
+      return next
+    })
+  }, [])
+
+  const handleRenameTask = useCallback((taskId: string, newName: string) => {
+    setTaskNames(prev => {
+      const next = { ...prev, [taskId]: newName }
+      writeTaskNames(next)
       return next
     })
   }, [])
@@ -568,9 +577,11 @@ export default function App() {
         onResize={handleSidebarResize}
         onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
         onRenameProject={handleRenameProject}
+        onRenameTask={handleRenameTask}
         onOpenInFinder={handleOpenInFinder}
         onRemoveProject={handleRemoveProject}
         projectNames={projectNames}
+        taskNames={taskNames}
       />
 
       {/* 右侧主区 */}
