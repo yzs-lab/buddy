@@ -103,9 +103,9 @@ code { font-family: var(--font-mono); font-size: 0.875em; padding: 2px 6px; back
 .text-kimi { color: var(--actor-kimi); }
 .actors-note { text-align: center; margin-top: 24px; font-size: 12px; color: var(--muted); }
 
-.flow-steps { display: flex; flex-direction: column; align-items: center; gap: 16px; margin-bottom: 32px; }
+.flow-steps { display: flex; flex-direction: column; align-items: stretch; gap: 16px; margin-bottom: 32px; }
 @media (min-width: 768px) { .flow-steps { flex-direction: row; justify-content: center; } }
-.flow-step { border-radius: var(--radius); padding: 16px 28px; text-align: center; }
+.flow-step { flex: 1; border-radius: var(--radius); padding: 20px 28px; text-align: center; }
 .flow-step-label { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.12em; opacity: 0.6; margin-bottom: 4px; }
 .flow-step-text { font-size: 15px; font-weight: 600; }
 .flow-step--solid { background: var(--ink); color: var(--canvas); }
@@ -126,11 +126,13 @@ code { font-family: var(--font-mono); font-size: 0.875em; padding: 2px 6px; back
 .guide-tip { display: flex; align-items: flex-start; gap: 8px; margin-top: 16px; font-size: 14px; line-height: 1.625; color: var(--secondary); }
 .guide-tip-icon { width: 16px; height: 16px; flex-shrink: 0; margin-top: 2px; color: var(--accent); }
 
-.guide-steps { margin: 64px auto 0; }
-.guide-steps-title { text-align: center; font-size: 18px; font-weight: 600; color: var(--ink); margin-bottom: 32px; }
+.guide-steps { margin: 64px auto 0; display: grid; grid-template-columns: 1fr; gap: 32px; }
+@media (min-width: 768px) { .guide-steps { grid-template-columns: 1fr 1fr; } }
+.guide-steps-title { grid-column: 1 / -1; text-align: center; font-size: 18px; font-weight: 600; color: var(--ink); margin-bottom: 0; }
 .guide-step { display: flex; gap: 20px; }
 .guide-step-num { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; flex-shrink: 0; border-radius: 50%; background: var(--ink); color: var(--canvas); font-size: 14px; font-weight: 700; position: relative; z-index: 1; }
-.guide-step-body { padding-bottom: 32px; }
+.guide-step-body { }
+.guide-step:not(.guide-step--last) .guide-step-num::after { display: none; }
 .guide-step-title { font-size: 16px; font-weight: 600; color: var(--ink); margin-bottom: 4px; }
 .guide-step-text { font-size: 14px; line-height: 1.625; color: var(--secondary); }
 .guide-step:not(.guide-step--last) .guide-step-num::after { content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); width: 1px; height: 48px; background: var(--border); }

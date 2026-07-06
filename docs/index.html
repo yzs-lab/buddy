@@ -282,23 +282,23 @@
     <h2 class="section-title">常见问题</h2>
   </div>
   <div class="faq-list">
-    <details class="faq-item">
+    <details class="faq-item" open>
       <summary>Buddy 和单个 AI CLI 工具有什么区别？</summary>
       <p>Buddy 让两个 AI Actor（执行方 + 审查方）轮流工作：执行方写代码，审查方挑毛病，循环推进。这比单次对话更接近真实团队协作，能显著提升一次通过率与代码质量。</p>
     </details>
-    <details class="faq-item">
+    <details class="faq-item" open>
       <summary>任务什么时候会结束？</summary>
       <p>采用「双确认结束」机制：执行方和审查方都必须发出 <code>type=break</code> 信号，任务才会转为 DONE。单方 break 不会终止任务，避免一方偷懒提前结束。</p>
     </details>
-    <details class="faq-item">
+    <details class="faq-item" open>
       <summary>崩溃或重启后任务还在吗？</summary>
       <p>在。所有任务状态以文件形式持久化在 <code>~/Library/Application Support/buddy/</code>。重启时，处于 <code>RUNNING</code> 的任务会自动重置为 <code>PAUSED</code>，方便你继续。</p>
     </details>
-    <details class="faq-item">
+    <details class="faq-item" open>
       <summary>能边运行边追加指令吗？</summary>
       <p>可以。Actor 运行期间发送的指令会进入指令队列，当前轮次结束后自动执行，无需打断。</p>
     </details>
-    <details class="faq-item">
+    <details class="faq-item" open>
       <summary>数据会离开本地吗？</summary>
       <p>Buddy 本身不联网传输你的任务数据，所有状态、对话记录、产物都保存在本地文件系统。AI 推理由你配置的 CLI 工具各自完成。</p>
     </details>
