@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.2.3] - 2026-07-10
+
+### Changed
+- 统一 `formatDuration` 为 `xdxhxmxs` 紧凑英文格式，主进程通知与渲染进程逻辑一致
+- 新增天(d)级别时长支持，移除渲染进程 600s 阈值特殊分支，sub-second 统一用 `Math.max(0, Math.floor(ms))` 防止负值
+
+### Fixed
+- 通知文案由中文（如「18分42秒」）改为紧凑格式（如 18m42s）
+- 补充 `formatDuration` 单元测试，覆盖 ms/s/m/h/d 各级别
+
+---
+
 ## [1.2.2] - 2026-07-07
 
 ### Added
