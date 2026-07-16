@@ -163,8 +163,9 @@ export function buildActorPrompt(input: BuildActorPromptInput): string {
 
   const launcher = settings.launchers?.[input.actor]
   const presetId = launcher?.prompt_preset_id
+  const promptPresets = settings.prompt_presets ?? input.globalSettings?.prompt_presets
   const preset = presetId
-    ? input.globalSettings?.prompt_presets?.find((item) => item.id === presetId)
+    ? promptPresets?.find((item) => item.id === presetId)
     : undefined
   if (preset?.prompt.trim()) {
     parts.push('', `## Agent prompt preset: ${preset.name}`, preset.prompt.trim())

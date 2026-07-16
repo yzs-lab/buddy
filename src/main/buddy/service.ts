@@ -354,8 +354,20 @@ export class BuddyCoreService {
 
         const stdoutText = outputLines.join('\n')
         const rawEvents = await collectRawEvents(eventFile, stdoutText, launcherCommand.kind)
-        const outputText = await collectOutputText(actor, launcherCommand.kind, outputFile, stdoutText)
-        const parsedLines = parseActorEvents(parserActorForKind(actor, launcherCommand.kind), rawEvents)
+        const cursorPartialOutput = launcherCommand.kind === 'native_cursor'
+          && launcher.cursor?.stream_partial_output === true
+        const outputText = await collectOutputText(
+          actor,
+          launcherCommand.kind,
+          outputFile,
+          stdoutText,
+          cursorPartialOutput
+        )
+        const parsedLines = parseActorEvents(
+          parserActorForKind(actor, launcherCommand.kind),
+          rawEvents,
+          { cursorPartialOutput }
+        )
 
         if (result.exitCode !== 0) {
           const stderrText = stderrLines.join('\n').trim()

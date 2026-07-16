@@ -210,6 +210,17 @@ export function useUpdateGlobalSettings() {
   })
 }
 
+export function useUpdateGlobalSettingsPatch() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ base, patch }: { base: GlobalSettings; patch: Partial<GlobalSettings> }) =>
+      api.updateGlobalSettingsPatch(base, patch),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bootstrap'] })
+    }
+  })
+}
+
 export function useTestLauncher() {
   return useMutation({
     mutationFn: ({ actor, command, env, options }: { actor: string; command: string; env?: Record<string, string>; options?: Partial<Launcher> }) =>

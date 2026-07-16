@@ -126,6 +126,8 @@ export interface TaskSettings {
   seed_kimi_session_id?: string
   /** Seed sessions keyed by configurable agent profile ID. */
   seed_agent_sessions?: Record<string, string>
+  /** Snapshot of prompt presets available when the task was created. */
+  prompt_presets?: PromptPreset[]
 }
 
 export type LauncherBackend = 'auto' | 'claude' | 'codex' | 'opencode' | 'kimi' | 'cursor' | 'contract'

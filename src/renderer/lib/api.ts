@@ -21,6 +21,34 @@ function buddy() {
   return window.buddy
 }
 
+let latestGlobalSettings: GlobalSettings | undefined
+let globalSettingsSaveQueue: Promise<void> = Promise.resolve()
+
+function updateGlobalSettingsPatch(
+  base: GlobalSettings,
+  patch: Partial<GlobalSettings>
+): Promise<GlobalSettings> {
+  let resolveResult!: (value: GlobalSettings) => void
+  let rejectResult!: (reason: unknown) => void
+  const result = new Promise<GlobalSettings>((resolve, reject) => {
+    resolveResult = resolve
+    rejectResult = reject
+  })
+  globalSettingsSaveQueue = globalSettingsSaveQueue
+    .catch(() => undefined)
+    .then(async () => {
+      try {
+        const next = { ...(latestGlobalSettings ?? base), ...patch }
+        const saved = await buddy().updateGlobalSettings(next)
+        latestGlobalSettings = saved
+        resolveResult(saved)
+      } catch (error) {
+        rejectResult(error)
+      }
+    })
+  return result
+}
+
 export const api = {
   checkHealth: () => buddy().checkHealth(),
   bootstrap: () => buddy().bootstrap(),
@@ -57,6 +85,7 @@ export const api = {
     buddy().getTaskStats(taskId, workspaceKey) as Promise<TaskStats | null>,
   updateGlobalSettings: (settings: GlobalSettings) =>
     buddy().updateGlobalSettings(settings),
+  updateGlobalSettingsPatch,
   listCursorModels: (input?: CursorModelDiscoveryInput) =>
     buddy().listCursorModels(input),
   gitStatus: (repoRoot: string) =>

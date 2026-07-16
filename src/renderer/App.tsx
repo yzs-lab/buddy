@@ -935,15 +935,21 @@ function CreateTaskModal({
   }
 
   const actorOptions: Actor[] = Object.entries(normalizedGlobalSettings.launchers ?? {})
-    .filter(([, launcher]) => launcher.command.trim())
+    .filter(([actor, launcher]) => {
+      if (!launcher.command.trim()) return false
+      if (['claude', 'codex', 'opencode', 'kimi'].includes(actor)) return true
+      return Boolean(launcher.backend && launcher.backend !== 'auto' && launcher.backend !== 'contract')
+    })
     .map(([actor]) => actor)
 
   useEffect(() => {
     if (!actorOptions.length) return
-    if (!actorOptions.includes(implementer)) setImplementer(actorOptions[0])
-    if (!actorOptions.includes(reviewer)) {
-      setReviewer(actorOptions.find((actor) => actor !== implementer) ?? actorOptions[0])
-    }
+    const nextImplementer = actorOptions.includes(implementer) ? implementer : actorOptions[0]
+    const nextReviewer = actorOptions.includes(reviewer) && reviewer !== nextImplementer
+      ? reviewer
+      : (actorOptions.find((actor) => actor !== nextImplementer) ?? actorOptions[0])
+    if (nextImplementer !== implementer) setImplementer(nextImplementer)
+    if (nextReviewer !== reviewer) setReviewer(nextReviewer)
   }, [actorOptions.join('\0'), implementer, reviewer])
 
   const optionLabel = (actor: string) => {
@@ -1116,7 +1122,10 @@ function CreateTaskModal({
               <label className="block text-xs font-medium text-fg-secondary mb-1">{t('modal.create.implementer')}</label>
               <select
                 value={implementer}
-                onChange={(e) => setImplementer(e.target.value as Actor)}
+                onChange={(e) => {
+                  setImplementer(e.target.value as Actor)
+                  setImplementerSession('')
+                }}
                 className="w-full px-3 py-1.5 border border-border rounded-lg focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent bg-bg text-xs"
               >
                 {actorOptions.map(a => (
@@ -1128,7 +1137,10 @@ function CreateTaskModal({
               <label className="block text-xs font-medium text-fg-secondary mb-1">{t('modal.create.reviewer')}</label>
               <select
                 value={reviewer}
-                onChange={(e) => setReviewer(e.target.value as Actor)}
+                onChange={(e) => {
+                  setReviewer(e.target.value as Actor)
+                  setReviewerSession('')
+                }}
                 className="w-full px-3 py-1.5 border border-border rounded-lg focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent bg-bg text-xs"
               >
                 {actorOptions.map(a => (

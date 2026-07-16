@@ -63,14 +63,21 @@ describe('buddy actor parsers', () => {
       model_call_id: 'call-1',
       message: { content: [{ type: 'text', text: 'duplicate' }] },
       session_id: 'cursor-session'
-    }))
+    }), true)
+    const finalFlush = parseCursorStreamLine(JSON.stringify({
+      type: 'assistant',
+      message: { content: [{ type: 'text', text: 'final duplicate' }] },
+      session_id: 'cursor-session'
+    }), true)
     const output = extractActorOutput('cursor', [
       JSON.stringify({ type: 'system', subtype: 'init', session_id: 'cursor-session', model: 'Composer 2.5' }),
       JSON.stringify({ type: 'assistant', message: { content: [{ type: 'text', text: 'intermediate' }] }, session_id: 'cursor-session' }),
       JSON.stringify({ type: 'result', result: '{"type":"break","content":"finished"}', session_id: 'cursor-session' })
     ].join('\n'))
 
-    expect(duplicate).toMatchObject({ noise: true, text: undefined, sessionId: 'cursor-session' })
+    expect(duplicate).toMatchObject({ noise: true, sessionId: 'cursor-session' })
+    expect(duplicate.text).toBeUndefined()
+    expect(finalFlush).toMatchObject({ noise: true, sessionId: 'cursor-session' })
     expect(output).toBe('{"type":"break","content":"finished"}')
   })
 

@@ -41,9 +41,15 @@ export async function discoverCursorModels(
   }
 
   try {
+    const cliEnv = { ...(input.env ?? {}) }
+    if (apiWarning && /HTTP (?:401|403)\b/.test(apiWarning)) {
+      // A rejected key would override the CLI's valid local login. Empty it so
+      // Cursor Agent can fall back to its authenticated account session.
+      cliEnv.CURSOR_API_KEY = ''
+    }
     const models = await fetchCursorModelsFromCli(
       input.command?.trim() || 'agent',
-      input.env
+      cliEnv
     )
     return {
       models,

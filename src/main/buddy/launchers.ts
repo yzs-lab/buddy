@@ -58,6 +58,8 @@ export function parserActorForKind(actor: string, kind: LauncherCommandKind): st
 
 /** ANSI escape sequence pattern for stripping TTY output */
 const ANSI_PATTERN = /\x1b\[[0-9;]*[a-zA-Z]|\x1b\].*?(?:\x07|\x1b\\)/g
+const CURSOR_STDIN_PROMPT_INSTRUCTION = 'Follow the complete Buddy turn instructions provided on stdin.'
+const CURSOR_POSITIONAL_PROMPT_MAX_BYTES = 24_000
 
 /** Result from a PTY-based launcher run */
 export interface PtyRunResult {
@@ -235,12 +237,18 @@ export function buildLauncherCommand(input: LauncherCommandInput): LauncherComma
     if (options.sandbox && options.sandbox !== 'default') args.push('--sandbox', options.sandbox)
     if (input.sessionId) args.push('--resume', input.sessionId)
     args.push(...(options.extra_args ?? []).filter((arg) => arg.trim() !== ''))
+    const promptText = input.promptText ?? ''
+    const useStdin = Buffer.byteLength(promptText, 'utf8') > CURSOR_POSITIONAL_PROMPT_MAX_BYTES
+    // Cursor's documented print mode takes a positional prompt. Very large
+    // Buddy turns would exceed platform argv limits, so those use Cursor's
+    // documented pipe-as-context form plus a short positional instruction.
+    args.push(useStdin ? CURSOR_STDIN_PROMPT_INSTRUCTION : promptText)
 
     return {
       command,
       args,
       kind,
-      stdinText: input.promptText
+      ...(useStdin ? { stdinText: promptText } : {})
     }
   }
 
@@ -308,7 +316,11 @@ export function commandKindFor(
   if (executable === 'codex' || (executable === 'wecode' && baseCmd[1] === 'codex')) return 'native_codex'
   if (executable === 'opencode') return 'native_opencode'
   if (executable === 'kimi') return 'native_kimi'
-  if (executable === 'agent' || executable === 'cursor-agent') return 'native_cursor'
+  if (executable === 'cursor-agent') return 'native_cursor'
+  if (
+    executable === 'agent'
+    && (actor === 'cursor' || actor === 'cursor-agent' || actor.startsWith('cursor-agent-'))
+  ) return 'native_cursor'
   // Fallback: when no command is specified, infer from actor name
   if (executable === '' || executable === 'wecode') {
     if (actor === 'claude') return 'native_claude'
@@ -357,12 +369,8 @@ export async function runLauncher(input: {
 
   child.stdout!.setEncoding('utf8')
   child.stderr!.setEncoding('utf8')
-  child.stdout!.on('data', (chunk: string) => {
-    for (const line of chunk.split(/\r?\n/).filter(Boolean)) input.onStdout(line)
-  })
-  child.stderr!.on('data', (chunk: string) => {
-    for (const line of chunk.split(/\r?\n/).filter(Boolean)) input.onStderr(line)
-  })
+  attachLineReader(child.stdout!, input.onStdout)
+  attachLineReader(child.stderr!, input.onStderr)
 
   // Write prompt text to stdin, then close the writable side.
   // The child may exit before we finish writing (e.g. wecode auto-upgrades
@@ -379,7 +387,9 @@ export async function runLauncher(input: {
   }
 
   const timeout = setTimeout(() => child.kill('SIGTERM'), input.timeoutMs)
-  const [exitCode, signal] = await once(child, 'exit') as [number | null, string | null]
+  // `close` fires after stdio has been drained; `exit` can race the final
+  // stdout chunk and truncate a terminal result event.
+  const [exitCode, signal] = await once(child, 'close') as [number | null, string | null]
   clearTimeout(timeout)
   return { exitCode, signal }
 }
@@ -436,4 +446,23 @@ function cleanCursorBaseCommand(baseCmd: string[]): string[] {
     cleaned.push(part)
   }
   return cleaned
+}
+
+function attachLineReader(
+  stream: NodeJS.ReadableStream,
+  onLine: (line: string) => void
+): void {
+  let pending = ''
+  stream.on('data', (chunk: string | Buffer) => {
+    pending += typeof chunk === 'string' ? chunk : chunk.toString('utf8')
+    const lines = pending.split(/\r?\n/)
+    pending = lines.pop() ?? ''
+    for (const line of lines) {
+      if (line) onLine(line)
+    }
+  })
+  stream.on('end', () => {
+    if (pending) onLine(pending)
+    pending = ''
+  })
 }

@@ -45,6 +45,18 @@ describe('needsHealthCheck', () => {
     expect(needsHealthCheck(state, baseSettings())).toBe(true)
   })
 
+  it('retries a partial health-check failure even when one actor has a session', () => {
+    const state = baseState({
+      claude_session_id: 'passed-session',
+      health_check: {
+        actors: { claude: 'passed', codex: 'failed' },
+        failed_actor: 'codex',
+        failed_reason: 'not authenticated'
+      }
+    })
+    expect(needsHealthCheck(state, baseSettings())).toBe(true)
+  })
+
   it('does not trigger a health check once the task has progressed past round 0', () => {
     const state = baseState({ round: 1 })
     expect(needsHealthCheck(state, baseSettings())).toBe(false)

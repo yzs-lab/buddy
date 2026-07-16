@@ -60,6 +60,16 @@ describe('BuddyStore settings and delete', () => {
     expect(settings.prompt_presets).toEqual([
       { id: 'implement', name: 'Implement', prompt: 'Implement and test.' }
     ])
+
+    const created = await store.createTask({ task_id: 'cursor-task', repo_root: root })
+    await store.updateGlobalSettings({
+      ...settings,
+      prompt_presets: [{ id: 'implement', name: 'Implement', prompt: 'Changed later.' }]
+    })
+    const detail = await store.getTaskDetail('cursor-task', created.workspace_key)
+    expect(detail.settings.prompt_presets).toEqual([
+      { id: 'implement', name: 'Implement', prompt: 'Implement and test.' }
+    ])
   })
 
   it('updates global settings', async () => {

@@ -7,6 +7,10 @@ export interface ParsedActorLine {
   noise?: boolean
 }
 
+export interface ParseActorOptions {
+  cursorPartialOutput?: boolean
+}
+
 export type BuddyMessage =
   | { kind: 'break'; content: string; reason?: string }
   | { kind: 'message'; text: string }
@@ -188,7 +192,7 @@ export function parseKimiJSONLine(line: string): ParsedActorLine {
   }
 }
 
-export function parseCursorStreamLine(line: string): ParsedActorLine {
+export function parseCursorStreamLine(line: string, partialOutput = false): ParsedActorLine {
   const json = JSON.parse(line) as Record<string, unknown>
   const type = textValue(json.type)
   const sessionId = textValue(json.session_id)
@@ -196,7 +200,10 @@ export function parseCursorStreamLine(line: string): ParsedActorLine {
   if (type === 'assistant') {
     // Partial streams emit a duplicate buffered flush before tool calls. The
     // event carrying model_call_id contains no new text and must be ignored.
-    if (json.model_call_id != null) {
+    if (
+      json.model_call_id != null
+      || (partialOutput && typeof json.timestamp_ms !== 'number')
+    ) {
       return { sessionId, rawType: type, noise: true }
     }
     const message = objectValue(json.message)
@@ -263,31 +270,31 @@ function kimiToolDetail(toolName: string, args: unknown): string | undefined {
   return undefined
 }
 
-export function parseActorLine(actor: string, line: string): ParsedActorLine {
+export function parseActorLine(actor: string, line: string, options: ParseActorOptions = {}): ParsedActorLine {
   if (actor === 'claude') return parseClaudeStreamLine(line)
   if (actor === 'codex') return parseCodexJsonLine(line)
   if (actor === 'opencode') return parseOpenCodeJsonLine(line)
   if (actor === 'kimi') return parseKimiJSONLine(line)
-  if (actor === 'cursor') return parseCursorStreamLine(line)
+  if (actor === 'cursor') return parseCursorStreamLine(line, options.cursorPartialOutput)
   return parseCodexJsonLine(line)
 }
 
-export function parseActorEvents(actor: string, rawEvents: string): ParsedActorLine[] {
+export function parseActorEvents(actor: string, rawEvents: string, options: ParseActorOptions = {}): ParsedActorLine[] {
   return rawEvents.split(/\r?\n/).flatMap((raw) => {
     if (!raw.trim()) return []
     try {
-      return [parseActorLine(actor, raw)]
+      return [parseActorLine(actor, raw, options)]
     } catch {
       return [{ text: raw }]
     }
   })
 }
 
-export function extractActorOutput(actor: string, rawEvents: string): string {
+export function extractActorOutput(actor: string, rawEvents: string, options: ParseActorOptions = {}): string {
   if (actor === 'claude') return extractClaudeOutput(rawEvents)
   if (actor === 'opencode') return extractOpenCodeOutput(rawEvents)
   if (actor === 'kimi') return extractKimiOutput(rawEvents)
-  if (actor === 'cursor') return extractCursorOutput(rawEvents)
+  if (actor === 'cursor') return extractCursorOutput(rawEvents, options.cursorPartialOutput)
   return extractGenericJsonOutput(rawEvents)
 }
 
@@ -517,7 +524,7 @@ function extractKimiOutput(rawEvents: string): string {
   return streamText || legacyLast.trim()
 }
 
-function extractCursorOutput(rawEvents: string): string {
+function extractCursorOutput(rawEvents: string, partialOutput = false): string {
   let result = ''
   const chunks: string[] = []
   for (const event of parseJsonEvents(rawEvents)) {
@@ -526,7 +533,11 @@ function extractCursorOutput(rawEvents: string): string {
       if (eventResult) result = eventResult
       continue
     }
-    if (event.type !== 'assistant' || event.model_call_id != null) continue
+    if (
+      event.type !== 'assistant'
+      || event.model_call_id != null
+      || (partialOutput && typeof event.timestamp_ms !== 'number')
+    ) continue
     const message = objectValue(event.message)
     if (!Array.isArray(message?.content)) continue
     chunks.push(...message.content.map(textFromContentPart).filter(Boolean))

@@ -4,7 +4,7 @@ import { HexColorPicker } from 'react-colorful'
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ChevronDown, CircleArrowOutUpLeft, Command, CornerDownLeft, Delete, Monitor, Moon, Option, Plus, RefreshCw, RotateCcw, Search, Space, Sun, Trash2 } from 'lucide-react'
 import { useTheme, ThemeMode } from '../hooks/useTheme'
 import { getThemesByType, getThemeById, BuddyTheme } from '../themes'
-import { useListCursorModels, useUpdateGlobalSettings } from '../hooks/useBuddy'
+import { useListCursorModels, useUpdateGlobalSettingsPatch } from '../hooks/useBuddy'
 import { useTestLauncher } from '../hooks/useBuddy'
 import type { TestLauncherResult } from '../../shared/types'
 import { useLanguagePref, useSendShortcut, useT, TFunction } from '../hooks/useI18n'
@@ -257,46 +257,63 @@ function GeneralSection() {
 
 function GeneralSettings({ globalSettings }: { globalSettings: GlobalSettings | null }) {
   const t = useT()
-  const updateMutation = useUpdateGlobalSettings()
+  const updateMutation = useUpdateGlobalSettingsPatch()
   const normalizedSettings = normalizeGlobalSettings(globalSettings)
-  const launchers = normalizedSettings.launchers ?? {}
-
-  const buildBase = (): GlobalSettings => normalizedSettings
+  const externalSignature = JSON.stringify(normalizedSettings)
+  const settingsRef = useRef<GlobalSettings>(normalizedSettings)
+  const externalSignatureRef = useRef(externalSignature)
+  const saveQueueRef = useRef<Promise<unknown>>(Promise.resolve())
+  const [pendingSaveCount, setPendingSaveCount] = useState(0)
+  if (pendingSaveCount === 0 && externalSignatureRef.current !== externalSignature) {
+    settingsRef.current = normalizedSettings
+    externalSignatureRef.current = externalSignature
+  }
+  const effectiveSettings = settingsRef.current
+  const launchers = effectiveSettings.launchers ?? {}
 
   const save = (patch: Partial<GlobalSettings>) => {
-    updateMutation.mutate({ ...buildBase(), ...patch })
+    const base = settingsRef.current
+    const next = { ...base, ...patch }
+    settingsRef.current = next
+    setPendingSaveCount((count) => count + 1)
+    saveQueueRef.current = saveQueueRef.current
+      .catch(() => undefined)
+      .then(() => updateMutation.mutateAsync({ base, patch }))
+      .finally(() => setPendingSaveCount((count) => Math.max(0, count - 1)))
   }
 
   const saveLauncher = (actor: string, patch: Partial<Launcher>) => {
-    const cur = launchers[actor] ?? defaultLauncherFor(actor)
+    const currentLaunchers = settingsRef.current.launchers ?? {}
+    const cur = currentLaunchers[actor] ?? defaultLauncherFor(actor)
     const next = {
       ...cur,
       ...patch,
       env: patch.env ? { ...patch.env } : cur.env,
       cursor: patch.cursor ? { ...(cur.cursor ?? {}), ...patch.cursor } : cur.cursor
     }
-    save({ launchers: { ...launchers, [actor]: next } })
+    save({ launchers: { ...currentLaunchers, [actor]: next } })
   }
 
   const deleteLauncher = (actor: string) => {
-    const next = { ...launchers }
+    const next = { ...(settingsRef.current.launchers ?? {}) }
     delete next[actor]
     save({ launchers: next })
   }
 
   const addCursorProfile = () => {
+    const currentLaunchers = settingsRef.current.launchers ?? {}
     let suffix = 2
     let actor = `cursor-agent-${suffix}`
-    while (launchers[actor]) {
+    while (currentLaunchers[actor]) {
       suffix += 1
       actor = `cursor-agent-${suffix}`
     }
-    save({ launchers: { ...launchers, [actor]: defaultLauncherFor(actor) } })
+    save({ launchers: { ...currentLaunchers, [actor]: defaultLauncherFor(actor) } })
   }
 
   const saveAllTimeouts = (timeout: number) => {
     const nextLaunchers: Record<string, Launcher> = {}
-    for (const [actor, l] of Object.entries(launchers)) {
+    for (const [actor, l] of Object.entries(settingsRef.current.launchers ?? {})) {
       nextLaunchers[actor] = { ...l, timeout_seconds: timeout, env: l.env }
     }
     save({ launchers: nextLaunchers })
@@ -330,7 +347,7 @@ function GeneralSettings({ globalSettings }: { globalSettings: GlobalSettings | 
                 key={actor}
                 actor={actor}
                 launcher={launcher}
-                promptPresets={normalizedSettings.prompt_presets ?? []}
+                promptPresets={effectiveSettings.prompt_presets ?? []}
                 onSave={(next) => saveLauncher(actor, next)}
                 onDelete={actor === 'cursor-agent' ? undefined : () => deleteLauncher(actor)}
               />
@@ -365,7 +382,7 @@ function GeneralSettings({ globalSettings }: { globalSettings: GlobalSettings | 
             description={t('settings.collab.maxRounds.desc')}
             right={
               <EditableNumber
-                value={globalSettings?.max_rounds ?? 9999}
+                value={effectiveSettings.max_rounds ?? 9999}
                 min={-1}
                 max={999999}
                 onSave={(v) => save({ max_rounds: v })}
@@ -389,7 +406,7 @@ function GeneralSettings({ globalSettings }: { globalSettings: GlobalSettings | 
             description={t('settings.collab.maxFailures.desc')}
             right={
               <EditableNumber
-                value={globalSettings?.max_consecutive_failures ?? 10}
+                value={effectiveSettings.max_consecutive_failures ?? 10}
                 min={1}
                 max={999}
                 onSave={(v) => save({ max_consecutive_failures: v })}
@@ -401,7 +418,7 @@ function GeneralSettings({ globalSettings }: { globalSettings: GlobalSettings | 
             description={t('settings.collab.autoGenerateCommit.desc')}
             right={
               <Switch
-                checked={normalizedSettings.auto_generate_commit_message ?? true}
+                checked={effectiveSettings.auto_generate_commit_message ?? true}
                 onChange={(v) => save({ auto_generate_commit_message: v })}
               />
             }
@@ -411,7 +428,7 @@ function GeneralSettings({ globalSettings }: { globalSettings: GlobalSettings | 
             description={t('settings.collab.systemNotifications.desc')}
             right={
               <Switch
-                checked={normalizedSettings.system_notifications_enabled ?? true}
+                checked={effectiveSettings.system_notifications_enabled ?? true}
                 onChange={(v) => save({ system_notifications_enabled: v })}
               />
             }
@@ -424,13 +441,13 @@ function GeneralSettings({ globalSettings }: { globalSettings: GlobalSettings | 
 
 function PromptsSettings({ globalSettings }: { globalSettings: GlobalSettings | null }) {
   const t = useT()
-  const updateMutation = useUpdateGlobalSettings()
+  const updateMutation = useUpdateGlobalSettingsPatch()
   const normalizedSettings = normalizeGlobalSettings(globalSettings)
   const saved = normalizedSettings.custom_prompt ?? ''
   const savedPresets = normalizedSettings.prompt_presets ?? []
 
   const save = (patch: Partial<GlobalSettings>) => {
-    updateMutation.mutate({ ...normalizedSettings, ...patch })
+    updateMutation.mutate({ base: normalizedSettings, patch })
   }
 
   const [draft, setDraft] = useState(saved)
@@ -702,12 +719,13 @@ function CursorLauncherSection({
   const [testResult, setTestResult] = useState<TestLauncherResult | null>(null)
   const testMutation = useTestLauncher()
   const modelsMutation = useListCursorModels()
+  const launcherSignature = JSON.stringify(launcher)
 
   useEffect(() => {
     setDraft(cloneLauncher(launcher))
     setEnvText(formatEnv(launcher.env))
     setExtraArgsText((launcher.cursor?.extra_args ?? []).join('\n'))
-  }, [launcher])
+  }, [launcherSignature])
 
   const materialize = (): Launcher => ({
     ...draft,

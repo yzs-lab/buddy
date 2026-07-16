@@ -343,6 +343,17 @@ export class BuddyStore {
     const eventsPath = join(dir, 'artifacts', `${runId}-events.jsonl`)
     const raw = await readOptionalText(eventsPath)
     if (!raw.trim()) return null
+    let configuredLauncher: Launcher | undefined
+    if (actor) {
+      try {
+        const settings = await this.readTaskSettings(taskId, workspaceKey)
+        configuredLauncher = settings.launchers?.[actor]
+        if (!command && configuredLauncher?.command) command = configuredLauncher.command
+      } catch {
+        // Legacy/incomplete task settings do not block artifact inspection.
+      }
+    }
+    const cursorPartialOutput = configuredLauncher?.cursor?.stream_partial_output === true
 
     const events: RoundEventEntry[] = []
     let inputTokens = 0
@@ -373,7 +384,9 @@ export class BuddyStore {
         model = event.model as string | undefined
       }
 
-      if (event.type === 'assistant' && event.model_call_id == null && Array.isArray((event.message as Record<string, unknown>)?.content)) {
+      const duplicateCursorPartial = cursorPartialOutput
+        && (event.model_call_id != null || typeof event.timestamp_ms !== 'number')
+      if (event.type === 'assistant' && !duplicateCursorPartial && Array.isArray((event.message as Record<string, unknown>)?.content)) {
         for (const part of (event.message as Record<string, unknown>).content as Record<string, unknown>[]) {
           if (part.type === 'thinking') {
             events.push({ type: 'thinking', thinkingLength: (part.thinking as string)?.length ?? 0 })
@@ -524,14 +537,7 @@ export class BuddyStore {
 
     // Fallback: use the explicit profile model, then inspect legacy CLI config.
     if (!model && actor) {
-      try {
-        const settings = await this.readTaskSettings(taskId, workspaceKey)
-        const launcher = settings.launchers?.[actor]
-        if (launcher?.model?.trim()) model = launcher.model.trim()
-        if (!command && launcher?.command) command = launcher.command
-      } catch {
-        // Settings may not exist — that's fine
-      }
+      if (configuredLauncher?.model?.trim()) model = configuredLauncher.model.trim()
       if (!model) model = await detectModelFromConfig(actor, command)
     }
 
@@ -707,12 +713,13 @@ export class BuddyStore {
   }
 }
 
-const TRANSCRIPT_ROLES = new Set<TranscriptEntry['role']>([
+const TRANSCRIPT_ROLES = new Set([
   'human',
   'claude',
   'codex',
   'opencode',
   'kimi',
+  'cursor',
   'system'
 ])
 
@@ -741,10 +748,10 @@ function objectValue(value: unknown): Record<string, unknown> | undefined {
 
 function normalizeTranscriptRole(value: unknown): TranscriptEntry['role'] | null {
   if (typeof value !== 'string') return null
-  const role = value.trim().toLowerCase()
-  return TRANSCRIPT_ROLES.has(role as TranscriptEntry['role'])
-    ? role as TranscriptEntry['role']
-    : null
+  const role = value.trim()
+  if (!role) return null
+  const builtin = role.toLowerCase()
+  return TRANSCRIPT_ROLES.has(builtin) ? builtin : role
 }
 
 function textValue(value: unknown): string | undefined {
@@ -827,6 +834,7 @@ function defaultTaskSettings(
     seed_opencode_session_id: '',
     seed_kimi_session_id: '',
     seed_agent_sessions: {},
+    prompt_presets: normalizedGlobal.prompt_presets?.map((preset) => ({ ...preset })) ?? [],
     ...restOverrides
   } as TaskSettings
 }

@@ -153,6 +153,7 @@ export const taskSettingsSchema = z.object({
   seed_opencode_session_id: z.string().optional(),
   seed_kimi_session_id: z.string().optional(),
   seed_agent_sessions: z.record(z.string(), z.string()).default({}),
+  prompt_presets: z.array(promptPresetSchema).optional(),
   max_compact_retries: z.number().optional()
 })
 

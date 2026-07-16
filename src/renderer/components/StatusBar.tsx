@@ -61,6 +61,13 @@ const SESSION_FIELD: Record<string, keyof TaskState> = {
   kimi: 'kimi_session_id'
 }
 
+const SEED_SESSION_FIELD: Record<string, keyof TaskSettings> = {
+  claude: 'seed_claude_session_id',
+  codex: 'seed_codex_thread_id',
+  opencode: 'seed_opencode_session_id',
+  kimi: 'seed_kimi_session_id'
+}
+
 export function StatusBar({
   isOpen,
   width,
@@ -310,9 +317,13 @@ function ActorCard({
 }) {
   const sessionField = SESSION_FIELD[actor]
   const hasProfileSession = Object.prototype.hasOwnProperty.call(taskState?.agent_sessions ?? {}, actor)
+  const seedField = SEED_SESSION_FIELD[actor]
+  const seedSession = taskSettings?.seed_agent_sessions?.[actor]
+    || (seedField ? taskSettings?.[seedField] as string | undefined : undefined)
+    || ''
   const session = hasProfileSession
     ? (taskState?.agent_sessions?.[actor] ?? '')
-    : (sessionField ? (taskState?.[sessionField] as string | undefined) || '' : '')
+    : (sessionField ? (taskState?.[sessionField] as string | undefined) || seedSession : seedSession)
   const { impl, rev } = taskActors(taskSettings)
   const roleKey: TranslationKey | null =
     actor === impl ? 'statusBar.summary.implementer'

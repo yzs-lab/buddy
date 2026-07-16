@@ -338,6 +338,10 @@ export class BuddyRunner {
   ): Promise<{ exitCode: number | null; signal: string | null }> {
     const needsPty = kindNeedsPty(command.kind)
     const parserActor = parserActorForKind(actor, command.kind)
+    const parseOptions = {
+      cursorPartialOutput: command.kind === 'native_cursor'
+        && command.args.includes('--stream-partial-output')
+    }
 
     if (needsPty) {
       return runLauncherWithPty({
@@ -351,7 +355,7 @@ export class BuddyRunner {
             outputLines.push(line)
             if (this.events) {
               try {
-                const parsed = parseActorLine(parserActor, line)
+                const parsed = parseActorLine(parserActor, line, parseOptions)
                 if (parsed.text) {
                   this.events.publish({
                     workspace_key: workspaceKey,
@@ -384,7 +388,7 @@ export class BuddyRunner {
         outputLines.push(line)
         if (this.events) {
           try {
-            const parsed = parseActorLine(parserActor, line)
+            const parsed = parseActorLine(parserActor, line, parseOptions)
             if (parsed.text) {
               this.events.publish({
                 workspace_key: workspaceKey,
@@ -498,8 +502,13 @@ export class BuddyRunner {
 
       const stdoutText = outputLines.join('\n')
       const rawEvents = await collectRawEvents(eventFile, stdoutText, command.kind)
-      const outputText = await collectOutputText(actor, command.kind, outputFile, stdoutText)
-      const parsedLines = parseActorEvents(parserActorForKind(actor, command.kind), rawEvents)
+      const cursorPartialOutput = command.kind === 'native_cursor' && launcher.cursor?.stream_partial_output === true
+      const outputText = await collectOutputText(actor, command.kind, outputFile, stdoutText, cursorPartialOutput)
+      const parsedLines = parseActorEvents(
+        parserActorForKind(actor, command.kind),
+        rawEvents,
+        { cursorPartialOutput }
+      )
       const stderrText = stderrLines.join('\n').trim()
 
       if (result.exitCode !== 0) {
@@ -792,8 +801,13 @@ export class BuddyRunner {
 
       const stdoutText = outputLines.join('\n')
       const rawEvents = await collectRawEvents(eventFile, stdoutText, command.kind)
-      let outputText = await collectOutputText(actor, command.kind, outputFile, stdoutText)
-      const parsedLines = parseActorEvents(parserActorForKind(actor, command.kind), rawEvents)
+      const cursorPartialOutput = command.kind === 'native_cursor' && launcher.cursor?.stream_partial_output === true
+      let outputText = await collectOutputText(actor, command.kind, outputFile, stdoutText, cursorPartialOutput)
+      const parsedLines = parseActorEvents(
+        parserActorForKind(actor, command.kind),
+        rawEvents,
+        { cursorPartialOutput }
+      )
       if (actor === 'kimi' && sessionId && !parsedLines.some((line) => line.sessionId)) {
         parsedLines.push({ sessionId })
       }
@@ -875,7 +889,7 @@ export class BuddyRunner {
             taskId,
             workspaceKey,
             'system',
-            `${actorDisplayName(actor)} 达到上下文窗口限制，正在重置会话并注入精简上下文 (${compactRetries + 1}/${maxCompactRetries})...`,
+            `${actorDisplayName(actor, detail.settings)} 达到上下文窗口限制，正在重置会话并注入精简上下文 (${compactRetries + 1}/${maxCompactRetries})...`,
             { kind: 'session_reset', reset_attempt: compactRetries + 1 }
           )
           await this.resetSessionForActor(taskId, workspaceKey, actor, detail)
@@ -905,7 +919,7 @@ export class BuddyRunner {
           taskId,
           workspaceKey,
           'system',
-          `${actorDisplayName(actor)} 检测到自动升级，等待升级完成后重试 (${upgradeRetries + 1}/${maxUpgradeRetries})...`,
+          `${actorDisplayName(actor, detail.settings)} 检测到自动升级，等待升级完成后重试 (${upgradeRetries + 1}/${maxUpgradeRetries})...`,
           { kind: 'upgrade_retry', retry_attempt: upgradeRetries + 1 }
         )
         await new Promise((resolve) => setTimeout(resolve, UPGRADE_WAIT_MS))
@@ -1053,7 +1067,7 @@ export class BuddyRunner {
           taskId,
           workspaceKey,
           'system',
-          `${actorDisplayName(pendingBreak?.actor)} 和 ${actorDisplayName(actor)} 均确认当前阶段完成，但指令队列中仍有待执行指令，继续执行。`,
+          `${actorDisplayName(pendingBreak?.actor, detail.settings)} 和 ${actorDisplayName(actor, detail.settings)} 均确认当前阶段完成，但指令队列中仍有待执行指令，继续执行。`,
           { kind: 'round_notice', round }
         )
         // Fall through to auto-start logic (skip duplicate actor.finished)
@@ -1063,7 +1077,7 @@ export class BuddyRunner {
           taskId,
           workspaceKey,
           'system',
-          `${actorDisplayName(pendingBreak?.actor)} 和 ${actorDisplayName(actor)} 均确认任务完成，任务结束。`,
+          `${actorDisplayName(pendingBreak?.actor, detail.settings)} 和 ${actorDisplayName(actor, detail.settings)} 均确认任务完成，任务结束。`,
           { kind: 'round_notice', round, done_reason: 'dual_break_confirmed', ...(taskStats ? { stats: taskStats } : {}) }
         )
         await this.store.appendTaskEvent(taskId, workspaceKey, {
@@ -1092,7 +1106,7 @@ export class BuddyRunner {
         taskId,
         workspaceKey,
         'system',
-        `${actorDisplayName(actor)} 请求结束任务，等待 ${actorDisplayName(nextActor)} 确认。`,
+        `${actorDisplayName(actor, detail.settings)} 请求结束任务，等待 ${actorDisplayName(nextActor, detail.settings)} 确认。`,
         { kind: 'round_notice', round }
       )
       await this.store.appendTaskEvent(taskId, workspaceKey, {
@@ -1117,7 +1131,7 @@ export class BuddyRunner {
         taskId,
         workspaceKey,
         'system',
-        `${actorDisplayName(actor)} 认为任务尚未完成，${actorDisplayName(pendingBreak?.actor)} 的结束请求已撤回。`,
+        `${actorDisplayName(actor, detail.settings)} 认为任务尚未完成，${actorDisplayName(pendingBreak?.actor, detail.settings)} 的结束请求已撤回。`,
         { kind: 'round_notice', round }
       )
     }
@@ -1135,7 +1149,7 @@ export class BuddyRunner {
         taskId,
         workspaceKey,
         'system',
-        `${actorDisplayName(actor)} 已达到轮次上限，暂停等待确认。`,
+        `${actorDisplayName(actor, detail.settings)} 已达到轮次上限，暂停等待确认。`,
         { kind: 'round_notice', round }
       )
       await this.store.appendTaskEvent(taskId, workspaceKey, {
@@ -1639,10 +1653,11 @@ function buildCompactContextFallback(
 
 export function needsHealthCheck(state: TaskState, settings: TaskSettings): boolean {
   if (state.round > 0) return false
-  // A prior health check that succeeded means no ping is needed. A failed health check
-  // leaves health_check populated with a failed actor, which we DO want to retry — so only
-  // bail out when the stored result has no failed actor (i.e. it was a clean pass).
-  if (state.health_check && !state.health_check.failed_actor) return false
+  // A partial health-check failure may already have persisted the passing
+  // actor's session. The recorded failure must take precedence over sessions
+  // so Retry performs connectivity checks again.
+  if (state.health_check?.failed_actor) return true
+  if (state.health_check) return false
   const implementer = settings.implementer_actor
     ?? (settings.role_mode === 'codex_implements' ? 'codex' : 'claude')
   const reviewer = settings.reviewer_actor
@@ -1761,11 +1776,12 @@ export async function collectOutputText(
   actor: string,
   kind: LauncherCommandKind,
   outputFile: string,
-  stdoutText: string
+  stdoutText: string,
+  cursorPartialOutput = false
 ): Promise<string> {
   if (kind === 'native_claude' || kind === 'native_opencode' || kind === 'native_kimi' || kind === 'native_cursor') {
     const parserActor = parserActorForKind(actor, kind)
-    let output = extractActorOutput(parserActor, stdoutText)
+    let output = extractActorOutput(parserActor, stdoutText, { cursorPartialOutput })
     let message = parseBuddyMessage(output)
 
     // Fallback: some models (e.g. DeepSeek via OpenCode/Kimi) output buddy JSON
@@ -1810,7 +1826,11 @@ export async function collectOutputText(
   }
 
   if (await fileExists(outputFile)) return readFile(outputFile, 'utf8')
-  const extracted = extractActorOutput(parserActorForKind(actor, kind), stdoutText)
+  const extracted = extractActorOutput(
+    parserActorForKind(actor, kind),
+    stdoutText,
+    { cursorPartialOutput }
+  )
   return extracted || stdoutText
 }
 
