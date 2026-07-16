@@ -39,8 +39,6 @@ interface TaskMeta {
   context_text?: string
 }
 
-const ACTORS = ['claude', 'codex', 'opencode', 'kimi'] as const
-
 export class BuddyStore {
   constructor(public readonly dataRoot: string) {}
 
@@ -375,7 +373,7 @@ export class BuddyStore {
         model = event.model as string | undefined
       }
 
-      if (event.type === 'assistant' && Array.isArray((event.message as Record<string, unknown>)?.content)) {
+      if (event.type === 'assistant' && event.model_call_id == null && Array.isArray((event.message as Record<string, unknown>)?.content)) {
         for (const part of (event.message as Record<string, unknown>).content as Record<string, unknown>[]) {
           if (part.type === 'thinking') {
             events.push({ type: 'thinking', thinkingLength: (part.thinking as string)?.length ?? 0 })
@@ -384,6 +382,24 @@ export class BuddyStore {
           } else if (part.type === 'tool_use') {
             events.push({ type: 'tool_use', toolName: part.name as string, toolInput: part.input as Record<string, unknown> })
           }
+        }
+      }
+
+      // Cursor Agent stream-json tool events.
+      if (event.type === 'tool_call') {
+        const toolCall = objectValue(event.tool_call)
+        const [toolKind, payloadValue] = Object.entries(toolCall ?? {})[0] ?? []
+        const payload = objectValue(payloadValue)
+        const args = objectValue(payload?.args)
+        const toolName = toolKind?.replace(/ToolCall$/, '') || 'tool'
+        if (event.subtype === 'started') {
+          events.push({ type: 'tool_use', toolName, toolInput: args })
+        } else if (event.subtype === 'completed') {
+          const result = payload?.result
+          const preview = result == null
+            ? ''
+            : (typeof result === 'string' ? result : JSON.stringify(result)).slice(0, 200)
+          events.push({ type: 'tool_result', toolResultPreview: preview })
         }
       }
 
@@ -506,19 +522,17 @@ export class BuddyStore {
       durationMs = lastTs - firstTs
     }
 
-    // Fallback: detect model from actor config file when not available in streaming output
+    // Fallback: use the explicit profile model, then inspect legacy CLI config.
     if (!model && actor) {
-      // If command wasn't provided by caller, try reading it from task settings
-      if (!command) {
-        try {
-          const settings = await this.readTaskSettings(taskId, workspaceKey)
-          const launcher = settings.launchers?.[actor]
-          if (launcher?.command) command = launcher.command
-        } catch {
-          // Settings may not exist — that's fine
-        }
+      try {
+        const settings = await this.readTaskSettings(taskId, workspaceKey)
+        const launcher = settings.launchers?.[actor]
+        if (launcher?.model?.trim()) model = launcher.model.trim()
+        if (!command && launcher?.command) command = launcher.command
+      } catch {
+        // Settings may not exist — that's fine
       }
-      model = await detectModelFromConfig(actor, command)
+      if (!model) model = await detectModelFromConfig(actor, command)
     }
 
     return { runId, events, inputTokens, outputTokens, cacheReadTokens, durationMs, costUsd, model }
@@ -531,9 +545,8 @@ export class BuddyStore {
     // Collect run_ids grouped by actor, and track elapsed_ms per run
     const actorRuns = new Map<string, { runId: string; elapsedMs: number }[]>()
 
-    const ACTOR_ROLES = new Set(['claude', 'codex', 'opencode', 'kimi'])
     for (const entry of transcript) {
-      if (!ACTOR_ROLES.has(entry.role)) continue
+      if (entry.role === 'human' || entry.role === 'system') continue
       const meta = entry.meta as Record<string, unknown> | undefined
       const runId = meta?.run_id as string | undefined
       if (!runId) continue
@@ -813,6 +826,7 @@ function defaultTaskSettings(
     seed_codex_thread_id: normalizedGlobal.seed_codex_thread_id ?? '',
     seed_opencode_session_id: '',
     seed_kimi_session_id: '',
+    seed_agent_sessions: {},
     ...restOverrides
   } as TaskSettings
 }
@@ -827,9 +841,14 @@ function coerceLauncherOverrides(value: unknown): Record<string, Partial<Launche
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue
     const candidate = raw as Partial<Launcher>
     launchers[actor] = {
-      command: candidate.command,
-      env: candidate.env,
-      timeout_seconds: candidate.timeout_seconds
+      ...candidate,
+      env: candidate.env ? { ...candidate.env } : undefined,
+      cursor: candidate.cursor
+        ? {
+            ...candidate.cursor,
+            extra_args: candidate.cursor.extra_args ? [...candidate.cursor.extra_args] : undefined
+          }
+        : undefined
     }
   }
   return launchers
@@ -882,8 +901,15 @@ function defaultTaskState(
     codex_thread_id: null,
     opencode_session_id: null,
     kimi_session_id: null,
+    agent_sessions: {},
     context_hash: sha256Hex(contextText),
-    context_sent: Object.fromEntries(ACTORS.map((actor) => [actor, false])),
+    context_sent: Object.fromEntries(
+      [...new Set([
+        ...Object.keys(settings.launchers),
+        settings.implementer_actor,
+        settings.reviewer_actor
+      ].filter((actor): actor is string => Boolean(actor)))].map((actor) => [actor, false])
+    ),
     active_run: null,
     instruction_queue: [],
     countdown: null,

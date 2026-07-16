@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildLauncherCommand } from '../../../src/main/buddy/launchers'
+import { buildLauncherCommand, commandKindFor } from '../../../src/main/buddy/launchers'
 
 describe('launcher command builder', () => {
   it('builds Claude non-interactive stream-json command', () => {
@@ -153,6 +153,56 @@ describe('launcher command builder', () => {
       ],
       kind: 'native_kimi'
     })
+  })
+
+  it('builds a configurable Cursor Agent stream-json command', () => {
+    expect(buildLauncherCommand({
+      actor: 'cursor-agent-2',
+      command: 'agent --model stale --force',
+      backend: 'cursor',
+      model: 'composer-2.5',
+      cursor: {
+        mode: 'agent',
+        force: true,
+        trust: true,
+        approve_mcps: true,
+        sandbox: 'enabled',
+        stream_partial_output: true,
+        extra_args: ['--plugin-dir', '/tmp/plugin']
+      },
+      promptFile: '/tmp/prompt.md',
+      promptText: 'hello from cursor',
+      repoRoot: '/tmp/repo',
+      sessionId: 'cursor-session'
+    })).toEqual({
+      command: 'agent',
+      args: [
+        '-p',
+        '--output-format',
+        'stream-json',
+        '--stream-partial-output',
+        '--workspace',
+        '/tmp/repo',
+        '--model',
+        'composer-2.5',
+        '--force',
+        '--trust',
+        '--approve-mcps',
+        '--sandbox',
+        'enabled',
+        '--resume',
+        'cursor-session',
+        '--plugin-dir',
+        '/tmp/plugin'
+      ],
+      kind: 'native_cursor',
+      stdinText: 'hello from cursor'
+    })
+  })
+
+  it('detects both Cursor Agent executable names', () => {
+    expect(commandKindFor('profile-a', 'agent')).toBe('native_cursor')
+    expect(commandKindFor('profile-b', '/usr/local/bin/cursor-agent')).toBe('native_cursor')
   })
 
   it('builds custom launcher contract flags and environment', () => {

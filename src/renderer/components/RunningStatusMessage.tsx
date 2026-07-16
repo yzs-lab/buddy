@@ -65,6 +65,7 @@ function formatElapsed(startedAt: string): string {
 
 function actorColorVar(actor: string): string {
   if (['claude', 'codex', 'opencode', 'kimi'].includes(actor)) return `var(--actor-${actor})`
+  if (actor === 'cursor' || actor === 'cursor-agent' || actor.startsWith('cursor-agent-')) return 'var(--actor-cursor)'
   return 'var(--border)'
 }
 

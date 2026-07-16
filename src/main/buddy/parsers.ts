@@ -188,6 +188,58 @@ export function parseKimiJSONLine(line: string): ParsedActorLine {
   }
 }
 
+export function parseCursorStreamLine(line: string): ParsedActorLine {
+  const json = JSON.parse(line) as Record<string, unknown>
+  const type = textValue(json.type)
+  const sessionId = textValue(json.session_id)
+
+  if (type === 'assistant') {
+    // Partial streams emit a duplicate buffered flush before tool calls. The
+    // event carrying model_call_id contains no new text and must be ignored.
+    if (json.model_call_id != null) {
+      return { sessionId, rawType: type, noise: true }
+    }
+    const message = objectValue(json.message)
+    const content = message?.content
+    const text = Array.isArray(content)
+      ? content.map(textFromContentPart).filter(Boolean).join('')
+      : undefined
+    return { text: text || undefined, sessionId, rawType: type }
+  }
+
+  if (type === 'tool_call') {
+    if (json.subtype === 'completed') {
+      return { sessionId, rawType: type, noise: true }
+    }
+    const detail = cursorToolDetail(json.tool_call)
+    return {
+      text: detail ? `🔧 ${detail}` : '🔧 tool',
+      sessionId,
+      rawType: type
+    }
+  }
+
+  return {
+    sessionId,
+    rawType: type,
+    noise: type === 'system' || type === 'user' || type === 'result'
+  }
+}
+
+function cursorToolDetail(value: unknown): string | undefined {
+  const toolCall = objectValue(value)
+  if (!toolCall) return undefined
+  const [kind, payloadValue] = Object.entries(toolCall)[0] ?? []
+  if (!kind) return undefined
+  const payload = objectValue(payloadValue)
+  const args = objectValue(payload?.args)
+  const name = kind.replace(/ToolCall$/, '')
+  const command = textValue(args?.command)
+  const path = textValue(args?.path)
+  const suffix = command ?? path
+  return suffix ? `${name} ${truncate(suffix, 80)}` : name
+}
+
 function kimiToolDetail(toolName: string, args: unknown): string | undefined {
   if (!args) return undefined
   // args may be a JSON string or an object
@@ -216,6 +268,7 @@ export function parseActorLine(actor: string, line: string): ParsedActorLine {
   if (actor === 'codex') return parseCodexJsonLine(line)
   if (actor === 'opencode') return parseOpenCodeJsonLine(line)
   if (actor === 'kimi') return parseKimiJSONLine(line)
+  if (actor === 'cursor') return parseCursorStreamLine(line)
   return parseCodexJsonLine(line)
 }
 
@@ -234,6 +287,7 @@ export function extractActorOutput(actor: string, rawEvents: string): string {
   if (actor === 'claude') return extractClaudeOutput(rawEvents)
   if (actor === 'opencode') return extractOpenCodeOutput(rawEvents)
   if (actor === 'kimi') return extractKimiOutput(rawEvents)
+  if (actor === 'cursor') return extractCursorOutput(rawEvents)
   return extractGenericJsonOutput(rawEvents)
 }
 
@@ -461,6 +515,23 @@ function extractKimiOutput(rawEvents: string): string {
   }
   const streamText = chunks.join('').trim()
   return streamText || legacyLast.trim()
+}
+
+function extractCursorOutput(rawEvents: string): string {
+  let result = ''
+  const chunks: string[] = []
+  for (const event of parseJsonEvents(rawEvents)) {
+    if (event.type === 'result') {
+      const eventResult = textValue(event.result)
+      if (eventResult) result = eventResult
+      continue
+    }
+    if (event.type !== 'assistant' || event.model_call_id != null) continue
+    const message = objectValue(event.message)
+    if (!Array.isArray(message?.content)) continue
+    chunks.push(...message.content.map(textFromContentPart).filter(Boolean))
+  }
+  return (result || chunks.join('')).trim()
 }
 
 function extractGenericJsonOutput(rawEvents: string): string {

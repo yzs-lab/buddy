@@ -5,9 +5,10 @@ import { ResizeHandle } from './ResizeHandle'
 import { FileStatus as FileStatusSection, CommitModal, type CommitFeedback } from './FileStatus'
 import { useGitStatus, type GitStatusResult } from '../hooks/useBuddy'
 import {
-  ACTOR_DISPLAY_NAME,
   ACTOR_LABEL_KEY,
   Actor,
+  actorColorVar,
+  actorDisplayName,
   taskActors,
   formatTimeWithRelativeDate,
   decodeErrorText,
@@ -53,7 +54,7 @@ function compactStatusInfo(status: TaskStatus | null | undefined): CompactStatus
   return null
 }
 
-const SESSION_FIELD: Record<Actor, keyof TaskState> = {
+const SESSION_FIELD: Record<string, keyof TaskState> = {
   claude: 'claude_session_id',
   codex: 'codex_thread_id',
   opencode: 'opencode_session_id',
@@ -308,7 +309,10 @@ function ActorCard({
   t: TFunction
 }) {
   const sessionField = SESSION_FIELD[actor]
-  const session = (taskState?.[sessionField] as string | undefined) || ''
+  const hasProfileSession = Object.prototype.hasOwnProperty.call(taskState?.agent_sessions ?? {}, actor)
+  const session = hasProfileSession
+    ? (taskState?.agent_sessions?.[actor] ?? '')
+    : (sessionField ? (taskState?.[sessionField] as string | undefined) || '' : '')
   const { impl, rev } = taskActors(taskSettings)
   const roleKey: TranslationKey | null =
     actor === impl ? 'statusBar.summary.implementer'
@@ -321,9 +325,9 @@ function ActorCard({
   }
 
   return (
-    <div className={`rounded-lg border p-3 bg-bg-elevated ${running ? '' : 'border-border-subtle'}`} style={running ? { borderColor: `var(--actor-${actor})` } : undefined}>
+    <div className={`rounded-lg border p-3 bg-bg-elevated ${running ? '' : 'border-border-subtle'}`} style={running ? { borderColor: actorColorVar(actor, taskSettings) } : undefined}>
       <div className="flex items-center justify-between mb-1.5">
-        <span className="text-sm font-medium">{ACTOR_DISPLAY_NAME[actor]}</span>
+        <span className="text-sm font-medium">{actorDisplayName(actor, taskSettings)}</span>
         {roleKey && <span className="text-xs text-fg-secondary">{t(roleKey)}</span>}
       </div>
       <div className="flex items-center justify-between gap-2 text-xs text-fg-secondary">

@@ -2,8 +2,10 @@ import type {
   AttachmentMeta,
   CountdownInput,
   CreateTaskInput,
+  CursorModelDiscoveryInput,
   GlobalSettings,
   InstructionQueueItem,
+  Launcher,
   RoundEventSummary,
   SendMessageInput,
   TestLauncherResult,
@@ -55,6 +57,8 @@ export const api = {
     buddy().getTaskStats(taskId, workspaceKey) as Promise<TaskStats | null>,
   updateGlobalSettings: (settings: GlobalSettings) =>
     buddy().updateGlobalSettings(settings),
+  listCursorModels: (input?: CursorModelDiscoveryInput) =>
+    buddy().listCursorModels(input),
   gitStatus: (repoRoot: string) =>
     buddy().gitStatus(repoRoot),
   gitStageAll: (repoRoot: string) =>
@@ -65,8 +69,8 @@ export const api = {
     buddy().gitDiffForCommitMessage(repoRoot),
   generateCommitMessage: (repoRoot: string, actorCommand?: string, lang?: string) =>
     buddy().generateCommitMessage(repoRoot, actorCommand, lang),
-  testLauncher: (actor: string, command: string, env?: Record<string, string>) =>
-    buddy().testLauncher(actor, command, env) as Promise<TestLauncherResult>,
+  testLauncher: (actor: string, command: string, env?: Record<string, string>, options?: Partial<Launcher>) =>
+    buddy().testLauncher(actor, command, env, options) as Promise<TestLauncherResult>,
   onTaskEvent: (callback: (payload: TaskEventEnvelope) => void) =>
     buddy().onTaskEvent(callback)
 }

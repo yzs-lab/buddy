@@ -54,4 +54,13 @@ describe('needsHealthCheck', () => {
     const state = baseState({ claude_session_id: 'seed-123' })
     expect(needsHealthCheck(state, baseSettings())).toBe(false)
   })
+
+  it('uses profile-keyed Cursor sessions when deciding whether to ping', () => {
+    const settings = baseSettings({
+      implementer_actor: 'cursor-agent',
+      reviewer_actor: 'cursor-agent-2',
+      seed_agent_sessions: { 'cursor-agent': 'cursor-seed' }
+    })
+    expect(needsHealthCheck(baseState({ next_actor: 'cursor-agent' }), settings)).toBe(false)
+  })
 })

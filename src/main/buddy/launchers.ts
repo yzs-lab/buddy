@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
 import { basename } from 'node:path'
+import type { CursorLauncherOptions, LauncherBackend } from '../../shared/types'
 import { installHintFor } from './shell-path'
 
 export type LauncherCommandKind =
@@ -8,6 +9,7 @@ export type LauncherCommandKind =
   | 'native_codex'
   | 'native_opencode'
   | 'native_kimi'
+  | 'native_cursor'
   | 'contract'
 
 export interface LauncherCommandInput {
@@ -22,6 +24,9 @@ export interface LauncherCommandInput {
   taskDir?: string
   runId?: string
   sessionId?: string
+  backend?: LauncherBackend
+  model?: string
+  cursor?: CursorLauncherOptions
 }
 
 export interface LauncherCommand {
@@ -47,6 +52,7 @@ export function parserActorForKind(actor: string, kind: LauncherCommandKind): st
   if (kind === 'native_kimi') return 'kimi'
   if (kind === 'native_claude') return 'claude'
   if (kind === 'native_codex') return 'codex'
+  if (kind === 'native_cursor') return 'cursor'
   return actor
 }
 
@@ -128,11 +134,14 @@ export async function runLauncherWithPty(input: {
 
 export function buildLauncherCommand(input: LauncherCommandInput): LauncherCommand {
   let baseCmd = splitCommand(input.command)
-  const kind = commandKindFor(input.actor, baseCmd)
+  const kind = commandKindFor(input.actor, baseCmd, input.backend)
   if (!baseCmd[0] && kind !== 'contract') baseCmd = [input.actor]
-  const [command, ...prefixArgs] = kind === 'native_codex'
+  const cleanedBaseCmd = kind === 'native_codex'
     ? cleanCodexBaseCommand(baseCmd)
-    : baseCmd
+    : kind === 'native_cursor'
+      ? cleanCursorBaseCommand(baseCmd)
+      : baseCmd
+  const [command, ...prefixArgs] = cleanedBaseCmd
 
   if (kind === 'native_claude') {
     return {
@@ -208,6 +217,33 @@ export function buildLauncherCommand(input: LauncherCommandInput): LauncherComma
     }
   }
 
+  if (kind === 'native_cursor') {
+    const options = input.cursor ?? {}
+    const args = [
+      ...prefixArgs,
+      '-p',
+      '--output-format',
+      'stream-json'
+    ]
+    if (options.stream_partial_output) args.push('--stream-partial-output')
+    if (input.repoRoot) args.push('--workspace', input.repoRoot)
+    if (input.model?.trim()) args.push('--model', input.model.trim())
+    if (options.mode && options.mode !== 'agent') args.push('--mode', options.mode)
+    if (options.force) args.push('--force')
+    if (options.trust) args.push('--trust')
+    if (options.approve_mcps) args.push('--approve-mcps')
+    if (options.sandbox && options.sandbox !== 'default') args.push('--sandbox', options.sandbox)
+    if (input.sessionId) args.push('--resume', input.sessionId)
+    args.push(...(options.extra_args ?? []).filter((arg) => arg.trim() !== ''))
+
+    return {
+      command,
+      args,
+      kind,
+      stdinText: input.promptText
+    }
+  }
+
   const mode = input.mode ?? (input.sessionId ? 'resume' : 'start')
   const repoRoot = input.repoRoot ?? ''
   const taskDir = input.taskDir ?? ''
@@ -254,9 +290,17 @@ export function buildLauncherCommand(input: LauncherCommandInput): LauncherComma
   }
 }
 
-export function commandKindFor(actor: string, command: string | string[]): LauncherCommandKind {
+export function commandKindFor(
+  actor: string,
+  command: string | string[],
+  backend?: LauncherBackend
+): LauncherCommandKind {
   const baseCmd = Array.isArray(command) ? command : splitCommand(command)
   const executable = basename(baseCmd[0] ?? '')
+  if (backend && backend !== 'auto') {
+    if (backend === 'contract') return 'contract'
+    return `native_${backend}` as LauncherCommandKind
+  }
   // Detect native CLI by executable name first, regardless of actor name.
   // This allows e.g. actor='kimi' with command='opencode -m provider/kimi-k2.6'
   // to be correctly identified as native_opencode.
@@ -264,12 +308,14 @@ export function commandKindFor(actor: string, command: string | string[]): Launc
   if (executable === 'codex' || (executable === 'wecode' && baseCmd[1] === 'codex')) return 'native_codex'
   if (executable === 'opencode') return 'native_opencode'
   if (executable === 'kimi') return 'native_kimi'
+  if (executable === 'agent' || executable === 'cursor-agent') return 'native_cursor'
   // Fallback: when no command is specified, infer from actor name
   if (executable === '' || executable === 'wecode') {
     if (actor === 'claude') return 'native_claude'
     if (actor === 'codex') return 'native_codex'
     if (actor === 'opencode') return 'native_opencode'
     if (actor === 'kimi') return 'native_kimi'
+    if (actor === 'cursor' || actor === 'cursor-agent' || actor.startsWith('cursor-agent-')) return 'native_cursor'
   }
   return 'contract'
 }
@@ -348,7 +394,7 @@ function commandNotFoundError(command: string, cause: unknown): Error {
   return err
 }
 
-function splitCommand(command: string): string[] {
+export function splitCommand(command: string): string[] {
   const matches = command.match(/(?:[^\s"]+|"[^"]*")+/g) ?? [command]
   return matches.map((part) => part.replace(/^"|"$/g, ''))
 }
@@ -356,4 +402,38 @@ function splitCommand(command: string): string[] {
 function cleanCodexBaseCommand(baseCmd: string[]): string[] {
   const legacyBareFlags = new Set(['--full-auto'])
   return [baseCmd[0], ...baseCmd.slice(1).filter((part) => !legacyBareFlags.has(part))]
+}
+
+function cleanCursorBaseCommand(baseCmd: string[]): string[] {
+  const valueOptions = new Set([
+    '--output-format',
+    '--workspace',
+    '--model',
+    '--mode',
+    '--sandbox',
+    '--resume'
+  ])
+  const bareOptions = new Set([
+    '-p',
+    '--print',
+    '--stream-partial-output',
+    '-f',
+    '--force',
+    '--yolo',
+    '--trust',
+    '--approve-mcps',
+    '--continue'
+  ])
+  const cleaned = [baseCmd[0]]
+  for (let index = 1; index < baseCmd.length; index++) {
+    const part = baseCmd[index]
+    if (bareOptions.has(part)) continue
+    if (valueOptions.has(part)) {
+      index += 1
+      continue
+    }
+    if ([...valueOptions].some((option) => part.startsWith(`${option}=`))) continue
+    cleaned.push(part)
+  }
+  return cleaned
 }
