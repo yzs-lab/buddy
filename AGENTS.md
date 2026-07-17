@@ -75,3 +75,13 @@ Detects whether a command is a "native" CLI (Codex/codex/opencode/kimi) or a gen
 - **Zod schemas**: Define in `src/main/buddy/schemas.ts`. Validate on read, not write.
 - **Sensitive data**: API keys are automatically redacted from event logs by `redact.ts`.
 - **i18n**: UI text goes through `useI18n` hook. Prompt builder detects human language and instructs actors to reply in the same language.
+
+## Cursor Cloud specific instructions
+
+This is a macOS-first Electron app, but dev/test/build all run on the Linux Cloud VM. Commands are in the `## Commands` section above and `package.json`. Notes specific to running here:
+
+- **Running the GUI (`pnpm dev`)**: Electron needs a display. A virtual display is available on `DISPLAY=:1`, and the app must run without the Chrome sandbox. Launch with `DISPLAY=:1 ELECTRON_DISABLE_SANDBOX=1 pnpm dev`. The `Failed to connect to the bus` / GPU-process / `APPIMAGE env is not defined` messages in the log are harmless in this headless container — the window still renders. The renderer dev server also serves standalone on `http://localhost:5173/`.
+- **AI actor CLIs are not installed** (`claude`, `codex`, `opencode`, `kimi`, `cursor-agent`). Creating a task works and persists to disk, but starting/running a task fails its connectivity health check and lands the task in `FAILED` (e.g. `Command 'claude' not found`). This is expected — end-to-end actor runs require installing and authenticating one of those external CLIs.
+- **Data root**: On Linux the hardcoded macOS path resolves to `~/Library/Application Support/buddy/` (i.e. `/home/ubuntu/Library/Application Support/buddy/`); tasks/workspaces are written there.
+- **E2E tests (`pnpm test:e2e`)**: Requires Playwright browsers (`pnpm exec playwright install chromium`). The script starts a Vite server on `127.0.0.1:5173` and runs Playwright against a mocked `window.buddy`/`window.api` (no Electron). Note: a few of these specs are currently stale relative to the UI (strict-mode selector violations, e.g. the `新建任务` text matching two buttons) and fail independent of environment setup.
+- **No lint command exists** — there is no ESLint/Prettier config. Use `pnpm typecheck` and `pnpm test` for verification. Packaging (`pnpm dist` / `release:signed`) is macOS-only and will not work here.
