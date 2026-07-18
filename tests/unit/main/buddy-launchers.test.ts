@@ -203,7 +203,40 @@ describe('launcher command builder', () => {
   it('detects both Cursor Agent executable names', () => {
     expect(commandKindFor('cursor-agent-2', 'agent')).toBe('native_cursor')
     expect(commandKindFor('profile-b', '/usr/local/bin/cursor-agent')).toBe('native_cursor')
-    expect(commandKindFor('claude', 'agent')).toBe('contract')
+    // Bare `agent` only maps to cursor for cursor actors; for a non-cursor,
+    // non-built-in actor it falls through to contract.
+    expect(commandKindFor('some-actor', 'agent')).toBe('contract')
+  })
+
+  it('treats the actor slot as authoritative for wrapper commands', () => {
+    // Some wrappers forward their args to the real CLI; the slot decides the
+    // launch style, so no --actor contract flags are injected.
+    expect(commandKindFor('claude', 'claude-wrapper --dangerously-skip-permissions')).toBe('native_claude')
+    expect(commandKindFor('codex', 'codex-wrapper')).toBe('native_codex')
+  })
+
+  it('builds native Claude flags for a wrapper command without contract --actor', () => {
+    const command = buildLauncherCommand({
+      actor: 'claude',
+      command: 'claude-wrapper --dangerously-skip-permissions',
+      promptFile: '/tmp/prompt.md',
+      promptText: 'hello'
+    })
+    expect(command).toEqual({
+      command: 'claude-wrapper',
+      args: [
+        '--dangerously-skip-permissions',
+        '-p',
+        '--output-format',
+        'stream-json',
+        '--verbose',
+        '--input-format',
+        'text'
+      ],
+      kind: 'native_claude',
+      stdinText: 'hello'
+    })
+    expect(command.args).not.toContain('--actor')
   })
 
   it('buffers JSONL records split across stdout chunks', async () => {
@@ -246,6 +279,7 @@ describe('launcher command builder', () => {
     expect(buildLauncherCommand({
       actor: 'claude',
       command: '/tmp/run-actor --flag',
+      backend: 'contract',
       mode: 'resume',
       repoRoot: '/tmp/repo',
       taskDir: '/tmp/task',

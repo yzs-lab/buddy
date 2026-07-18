@@ -309,9 +309,9 @@ export function commandKindFor(
     if (backend === 'contract') return 'contract'
     return `native_${backend}` as LauncherCommandKind
   }
-  // Detect native CLI by executable name first, regardless of actor name.
-  // This allows e.g. actor='kimi' with command='opencode -m provider/kimi-k2.6'
-  // to be correctly identified as native_opencode.
+  // Detect a recognized native CLI by executable name first, regardless of
+  // actor name. This allows e.g. actor='kimi' with command='opencode -m
+  // provider/kimi-k2.6' to be correctly identified as native_opencode.
   if (executable === 'claude' || (executable === 'wecode' && baseCmd[1] !== 'codex')) return 'native_claude'
   if (executable === 'codex' || (executable === 'wecode' && baseCmd[1] === 'codex')) return 'native_codex'
   if (executable === 'opencode') return 'native_opencode'
@@ -321,14 +321,15 @@ export function commandKindFor(
     executable === 'agent'
     && (actor === 'cursor' || actor === 'cursor-agent' || actor.startsWith('cursor-agent-'))
   ) return 'native_cursor'
-  // Fallback: when no command is specified, infer from actor name
-  if (executable === '' || executable === 'wecode') {
-    if (actor === 'claude') return 'native_claude'
-    if (actor === 'codex') return 'native_codex'
-    if (actor === 'opencode') return 'native_opencode'
-    if (actor === 'kimi') return 'native_kimi'
-    if (actor === 'cursor' || actor === 'cursor-agent' || actor.startsWith('cursor-agent-')) return 'native_cursor'
-  }
+  // The actor slot is authoritative: an unrecognized command in a built-in
+  // slot (empty, `wecode`, or another wrapper that forwards args to the real
+  // CLI) is launched with that slot's native flags. Custom commands that speak
+  // the Buddy contract protocol must opt in explicitly via backend: 'contract'.
+  if (actor === 'claude') return 'native_claude'
+  if (actor === 'codex') return 'native_codex'
+  if (actor === 'opencode') return 'native_opencode'
+  if (actor === 'kimi') return 'native_kimi'
+  if (actor === 'cursor' || actor === 'cursor-agent' || actor.startsWith('cursor-agent-')) return 'native_cursor'
   return 'contract'
 }
 
