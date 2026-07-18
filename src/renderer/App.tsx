@@ -702,6 +702,9 @@ export default function App() {
                   open={findOpen}
                   activation={findActivation}
                   scope={findScope}
+                  scopeKey={selectedTaskId && selectedWorkspaceKey
+                    ? `${selectedWorkspaceKey}:${selectedTaskId}`
+                    : null}
                   onClose={closeFind}
                 />
               </div>

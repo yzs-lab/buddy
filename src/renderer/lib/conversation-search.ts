@@ -38,8 +38,12 @@ function indexSegment(segment: Element): IndexedSegment {
       return
     }
     if (!(node instanceof Element)) return
+    const style = getComputedStyle(node)
     if (
-      node.matches('script, style, [aria-hidden="true"], [data-conversation-search-exclude]')
+      node.matches('script, style, template, noscript, [hidden], [aria-hidden="true"], [data-conversation-search-exclude]')
+      || style.display === 'none'
+      || style.visibility === 'hidden'
+      || style.contentVisibility === 'hidden'
     ) return
 
     const isBoundary = node !== segment && (node.tagName === 'BR' || BLOCK_ELEMENTS.has(node.tagName))
@@ -65,7 +69,10 @@ export function findConversationRanges(root: Element, query: string): Range[] {
 
   const pattern = new RegExp(escapeRegExp(query), 'giu')
   const ranges: Range[] = []
-  const segments = root.querySelectorAll(SEGMENT_SELECTOR)
+  const segments = Array.from(root.querySelectorAll(SEGMENT_SELECTOR)).filter((segment) => {
+    const parentSegment = segment.parentElement?.closest(SEGMENT_SELECTOR)
+    return !parentSegment || !root.contains(parentSegment)
+  })
 
   for (const segment of segments) {
     const indexed = indexSegment(segment)

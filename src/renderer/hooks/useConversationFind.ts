@@ -9,14 +9,16 @@ import {
 interface ConversationFindState {
   ranges: Range[]
   activeIndex: number
+  scrollRevision: number
 }
 
-const EMPTY_STATE: ConversationFindState = { ranges: [], activeIndex: -1 }
+const EMPTY_STATE: ConversationFindState = { ranges: [], activeIndex: -1, scrollRevision: 0 }
 
 export function useConversationFind(
   scope: HTMLElement | null,
   query: string,
-  enabled: boolean
+  enabled: boolean,
+  resetKey: string | null
 ) {
   const [state, setState] = useState<ConversationFindState>(EMPTY_STATE)
 
@@ -42,12 +44,22 @@ export function useConversationFind(
           ? -1
           : resetActive
             ? 0
-            : Math.min(Math.max(previous.activeIndex, 0), ranges.length - 1)
+            : Math.min(Math.max(previous.activeIndex, 0), ranges.length - 1),
+        scrollRevision: resetActive
+          ? previous.scrollRevision + 1
+          : previous.scrollRevision
       }))
     }
 
     recompute(true)
-    const observer = new MutationObserver(() => {
+    const observer = new MutationObserver((mutations) => {
+      const hasSearchableMutation = mutations.some((mutation) => {
+        const element = mutation.target instanceof Element
+          ? mutation.target
+          : mutation.target.parentElement
+        return !element?.closest('[data-conversation-search-exclude]')
+      })
+      if (!hasSearchableMutation) return
       if (scheduled) return
       scheduled = true
       queueMicrotask(() => {
@@ -62,7 +74,7 @@ export function useConversationFind(
       observer.disconnect()
       clearConversationHighlights()
     }
-  }, [enabled, query, scope])
+  }, [enabled, query, resetKey, scope])
 
   useEffect(() => {
     if (!enabled) {
@@ -70,8 +82,13 @@ export function useConversationFind(
       return
     }
     applyConversationHighlights(state.ranges, state.activeIndex)
-    scrollConversationRangeIntoView(state.ranges[state.activeIndex])
   }, [enabled, state])
+
+  useEffect(() => {
+    if (enabled && state.scrollRevision > 0) {
+      scrollConversationRangeIntoView(state.ranges[state.activeIndex])
+    }
+  }, [enabled, state.scrollRevision])
 
   useEffect(() => () => clearConversationHighlights(), [])
 
@@ -81,7 +98,11 @@ export function useConversationFind(
       const activeIndex = (
         previous.activeIndex + delta + previous.ranges.length
       ) % previous.ranges.length
-      return { ...previous, activeIndex }
+      return {
+        ...previous,
+        activeIndex,
+        scrollRevision: previous.scrollRevision + 1
+      }
     })
   }, [])
 

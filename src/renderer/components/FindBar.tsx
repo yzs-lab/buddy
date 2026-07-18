@@ -7,16 +7,17 @@ interface FindBarProps {
   open: boolean
   activation: number
   scope: HTMLElement | null
+  scopeKey: string | null
   onClose: () => void
 }
 
-export function FindBar({ open, activation, scope, onClose }: FindBarProps) {
+export function FindBar({ open, activation, scope, scopeKey, onClose }: FindBarProps) {
   const t = useT()
   const [query, setQuery] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const previouslyFocusedRef = useRef<HTMLElement | null>(null)
   const wasOpenRef = useRef(false)
-  const { total, active, findNext, findPrevious } = useConversationFind(scope, query, open)
+  const { total, active, findNext, findPrevious } = useConversationFind(scope, query, open, scopeKey)
 
   useEffect(() => {
     if (open && !wasOpenRef.current) {

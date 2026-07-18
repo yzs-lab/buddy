@@ -52,6 +52,22 @@ describe('conversation-scoped search', () => {
     expect(findConversationRanges(root, 'needle')).toHaveLength(0)
   })
 
+  it('ignores hidden text and does not double-count nested markers', () => {
+    const root = rootWithHtml(`
+      <div data-conversation-search-segment>
+        visible needle
+        <span hidden>hidden needle</span>
+        <span style="display: none">also hidden needle</span>
+        <span data-conversation-search-segment>nested needle</span>
+      </div>
+    `)
+
+    const ranges = findConversationRanges(root, 'needle')
+
+    expect(ranges).toHaveLength(2)
+    expect(ranges.map((range) => range.toString())).toEqual(['needle', 'needle'])
+  })
+
   it('treats the query as literal text rather than a regular expression', () => {
     const root = rootWithHtml(`
       <div data-conversation-search-segment>Use a+b and aab.</div>

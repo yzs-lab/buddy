@@ -131,7 +131,8 @@ export function RunningStatusMessage({
           onClick={onToggleExpand}
           style={onToggleExpand ? { cursor: 'pointer' } : undefined}
         >
-          {hint}{dotsPhases[dots]}
+          {hint}
+          <span aria-hidden="true" data-conversation-search-exclude>{dotsPhases[dots]}</span>
         </div>
       </div>
     </div>
