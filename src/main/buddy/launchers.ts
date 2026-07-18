@@ -321,15 +321,16 @@ export function commandKindFor(
     executable === 'agent'
     && (actor === 'cursor' || actor === 'cursor-agent' || actor.startsWith('cursor-agent-'))
   ) return 'native_cursor'
-  // The actor slot is authoritative: an unrecognized command in a built-in
-  // slot (empty, `wecode`, or another wrapper that forwards args to the real
-  // CLI) is launched with that slot's native flags. Custom commands that speak
-  // the Buddy contract protocol must opt in explicitly via backend: 'contract'.
-  if (actor === 'claude') return 'native_claude'
-  if (actor === 'codex') return 'native_codex'
-  if (actor === 'opencode') return 'native_opencode'
-  if (actor === 'kimi') return 'native_kimi'
-  if (actor === 'cursor' || actor === 'cursor-agent' || actor.startsWith('cursor-agent-')) return 'native_cursor'
+  // Preserve the legacy contract behavior for unrecognized commands. Wrapper
+  // commands are indistinguishable from contract launchers, so they opt in to
+  // native flags through an explicit backend selection.
+  if (executable === '' || executable === 'wecode') {
+    if (actor === 'claude') return 'native_claude'
+    if (actor === 'codex') return 'native_codex'
+    if (actor === 'opencode') return 'native_opencode'
+    if (actor === 'kimi') return 'native_kimi'
+    if (actor === 'cursor' || actor === 'cursor-agent' || actor.startsWith('cursor-agent-')) return 'native_cursor'
+  }
   return 'contract'
 }
 

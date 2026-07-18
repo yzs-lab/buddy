@@ -18,7 +18,7 @@ describe('BuddyRunner with fake launcher', () => {
       repo_root: '/tmp/repo',
       settings: {
         launchers: {
-          codex: { command: `${process.execPath} ${fake}`, env: {}, timeout_seconds: 5, backend: 'contract' }
+          codex: { command: `${process.execPath} ${fake}`, env: {}, timeout_seconds: 5 }
         }
       }
     })
@@ -121,7 +121,7 @@ describe('BuddyRunner with fake launcher', () => {
       repo_root: root,
       settings: {
         launchers: {
-          opencode: { command: `${process.execPath} ${fake}`, env: {}, timeout_seconds: 5, backend: 'contract' }
+          opencode: { command: `${process.execPath} ${fake}`, env: {}, timeout_seconds: 5 }
         }
       }
     })
@@ -157,8 +157,8 @@ describe('BuddyRunner with fake launcher', () => {
         implementer_actor: 'opencode',
         reviewer_actor: 'kimi',
         launchers: {
-          opencode: { command: `${process.execPath} ${fake}`, env: {}, timeout_seconds: 5, backend: 'contract' },
-          kimi: { command: `${process.execPath} ${fake}`, env: {}, timeout_seconds: 5, backend: 'contract' }
+          opencode: { command: `${process.execPath} ${fake}`, env: {}, timeout_seconds: 5 },
+          kimi: { command: `${process.execPath} ${fake}`, env: {}, timeout_seconds: 5 }
         }
       }
     })
@@ -200,7 +200,7 @@ describe('BuddyRunner with fake launcher', () => {
       settings: {
         seed_opencode_session_id: 'seed-session',
         launchers: {
-          opencode: { command: `${process.execPath} ${fake}`, env: {}, timeout_seconds: 5, backend: 'contract' }
+          opencode: { command: `${process.execPath} ${fake}`, env: {}, timeout_seconds: 5 }
         }
       }
     })
@@ -230,7 +230,7 @@ describe('BuddyRunner with fake launcher', () => {
       repo_root: root,
       settings: {
         launchers: {
-          claude: { command: `${process.execPath} ${fake}`, env: {}, timeout_seconds: 5, backend: 'contract' }
+          claude: { command: `${process.execPath} ${fake}`, env: {}, timeout_seconds: 5 }
         }
       }
     })
@@ -313,8 +313,8 @@ describe('BuddyRunner with fake launcher', () => {
       repo_root: root,
       settings: {
         launchers: {
-          claude: { command: `${process.execPath} ${fake}`, env: {}, timeout_seconds: 5, backend: 'contract' },
-          codex: { command: `${process.execPath} ${fake}`, env: {}, timeout_seconds: 5, backend: 'contract' }
+          claude: { command: `${process.execPath} ${fake}`, env: {}, timeout_seconds: 5 },
+          codex: { command: `${process.execPath} ${fake}`, env: {}, timeout_seconds: 5 }
         }
       }
     })

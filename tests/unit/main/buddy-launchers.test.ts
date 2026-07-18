@@ -208,17 +208,22 @@ describe('launcher command builder', () => {
     expect(commandKindFor('some-actor', 'agent')).toBe('contract')
   })
 
-  it('treats the actor slot as authoritative for wrapper commands', () => {
-    // Some wrappers forward their args to the real CLI; the slot decides the
-    // launch style, so no --actor contract flags are injected.
-    expect(commandKindFor('claude', 'claude-wrapper --dangerously-skip-permissions')).toBe('native_claude')
-    expect(commandKindFor('codex', 'codex-wrapper')).toBe('native_codex')
+  it('preserves contract semantics for unrecognized auto commands', () => {
+    expect(commandKindFor('claude', '/opt/buddy-contract')).toBe('contract')
+    expect(commandKindFor('claude', '/opt/buddy-contract', 'auto')).toBe('contract')
   })
 
-  it('builds native Claude flags for a wrapper command without contract --actor', () => {
+  it('uses an explicit native backend for wrapper commands', () => {
+    expect(commandKindFor('claude', 'claude-wrapper', 'claude')).toBe('native_claude')
+    expect(commandKindFor('kimi', 'vendor-wrapper', 'opencode')).toBe('native_opencode')
+    expect(commandKindFor('claude', 'claude', 'contract')).toBe('contract')
+  })
+
+  it('builds native Claude flags for an explicitly configured wrapper', () => {
     const command = buildLauncherCommand({
       actor: 'claude',
       command: 'claude-wrapper --dangerously-skip-permissions',
+      backend: 'claude',
       promptFile: '/tmp/prompt.md',
       promptText: 'hello'
     })
@@ -279,7 +284,6 @@ describe('launcher command builder', () => {
     expect(buildLauncherCommand({
       actor: 'claude',
       command: '/tmp/run-actor --flag',
-      backend: 'contract',
       mode: 'resume',
       repoRoot: '/tmp/repo',
       taskDir: '/tmp/task',

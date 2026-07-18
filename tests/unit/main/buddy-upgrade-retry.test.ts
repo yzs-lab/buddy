@@ -271,8 +271,8 @@ process.exit(0);
       settings: {
         role_mode: 'claude_implements',
         launchers: {
-          claude: { command: `${process.execPath} ${fake}`, env: { BUDDY_COUNTER_DIR: root }, timeout_seconds: 5, backend: 'contract' },
-          codex: { command: `${process.execPath} ${fake}`, env: { BUDDY_COUNTER_DIR: root }, timeout_seconds: 5, backend: 'contract' }
+          claude: { command: `${process.execPath} ${fake}`, env: { BUDDY_COUNTER_DIR: root }, timeout_seconds: 5 },
+          codex: { command: `${process.execPath} ${fake}`, env: { BUDDY_COUNTER_DIR: root }, timeout_seconds: 5 }
         }
       }
     })
