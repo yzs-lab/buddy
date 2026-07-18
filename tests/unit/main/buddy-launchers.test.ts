@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { buildLauncherCommand, commandKindFor, runLauncher } from '../../../src/main/buddy/launchers'
+import {
+  buildLauncherCommand,
+  commandKindFor,
+  normalizeLauncherSpawnError,
+  runLauncher
+} from '../../../src/main/buddy/launchers'
 
 describe('launcher command builder', () => {
   it('builds Claude non-interactive stream-json command', () => {
@@ -228,8 +233,8 @@ describe('launcher command builder', () => {
     expect(JSON.parse(lines[0]).result).toHaveLength(120000)
   })
 
-  it('passes a large Cursor prompt positionally (cursor-agent ignores stdin)', () => {
-    const promptText = 'x'.repeat(30_000)
+  it('passes an ordinary Cursor prompt positionally', () => {
+    const promptText = 'follow these instructions'
     const command = buildLauncherCommand({
       actor: 'cursor-agent',
       command: 'agent',
@@ -242,15 +247,30 @@ describe('launcher command builder', () => {
     expect(command.stdinText).toBeUndefined()
   })
 
-  it('rejects a Cursor prompt too large to pass as an argument', () => {
-    const promptText = 'x'.repeat(300_000)
-    expect(() => buildLauncherCommand({
+  it('uses the private prompt file for large Cursor prompts', () => {
+    const promptText = 'x'.repeat(30_000)
+    const command = buildLauncherCommand({
       actor: 'cursor-agent',
       command: 'agent',
       backend: 'cursor',
       promptFile: '/tmp/prompt.md',
       promptText
-    })).toThrow(/too large/)
+    })
+
+    expect(command.args).toContain('--add-dir')
+    expect(command.args).toContain('/tmp')
+    expect(command.args.at(-1)).toContain('"/tmp/prompt.md"')
+    expect(command.args.at(-1)).not.toContain(promptText)
+    expect(command.stdinText).toBeUndefined()
+  })
+
+  it('reports oversized spawn arguments without a command-not-found message', () => {
+    const cause = Object.assign(new Error('spawn E2BIG'), { code: 'E2BIG' })
+    const error = normalizeLauncherSpawnError('agent', cause)
+
+    expect(error.message).toContain('arguments or environment')
+    expect(error.message).not.toContain('not found')
+    expect((error as NodeJS.ErrnoException).code).toBe('E2BIG')
   })
 
   it('builds custom launcher contract flags and environment', () => {

@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
-import { basename } from 'node:path'
+import { basename, dirname } from 'node:path'
 import type { CursorLauncherOptions, LauncherBackend } from '../../shared/types'
 import { installHintFor } from './shell-path'
 
@@ -58,12 +58,10 @@ export function parserActorForKind(actor: string, kind: LauncherCommandKind): st
 
 /** ANSI escape sequence pattern for stripping TTY output */
 const ANSI_PATTERN = /\x1b\[[0-9;]*[a-zA-Z]|\x1b\].*?(?:\x07|\x1b\\)/g
-// cursor-agent's print mode (`-p`) only accepts the prompt as a positional
-// argument; it does NOT read a prompt piped on stdin. Buddy turns are well under
-// the platform argv limit (macOS ARG_MAX is ~1 MiB for argv+envp combined), so we
-// always pass the prompt positionally and only refuse prompts large enough to risk
-// an E2BIG spawn failure.
-const CURSOR_POSITIONAL_PROMPT_MAX_BYTES = 256_000
+// cursor-agent's print mode (`-p`) does not read a prompt from stdin. Keep
+// ordinary prompts positional, but use the private prompt artifact for larger
+// turns so no single argv entry approaches platform-specific size limits.
+const CURSOR_POSITIONAL_PROMPT_MAX_BYTES = 24_000
 
 /** Result from a PTY-based launcher run */
 export interface PtyRunResult {
@@ -242,16 +240,15 @@ export function buildLauncherCommand(input: LauncherCommandInput): LauncherComma
     if (input.sessionId) args.push('--resume', input.sessionId)
     args.push(...(options.extra_args ?? []).filter((arg) => arg.trim() !== ''))
     const promptText = input.promptText ?? ''
-    // cursor-agent -p reads the prompt only from this positional argument, never
-    // from piped stdin. Refuse prompts large enough to risk an E2BIG spawn error
-    // instead of silently truncating — the caller surfaces this as a run failure.
     if (Buffer.byteLength(promptText, 'utf8') > CURSOR_POSITIONAL_PROMPT_MAX_BYTES) {
-      throw new Error(
-        `Cursor Agent prompt is too large (${Buffer.byteLength(promptText, 'utf8')} bytes > ${CURSOR_POSITIONAL_PROMPT_MAX_BYTES}). `
-        + 'Reduce the turn/context size for this actor.'
+      args.push('--add-dir', dirname(input.promptFile))
+      args.push(
+        `Read the complete UTF-8 Buddy turn instructions from ${JSON.stringify(input.promptFile)} `
+        + 'before doing anything else, then follow those instructions exactly.'
       )
+    } else {
+      args.push(promptText)
     }
-    args.push(promptText)
 
     return {
       command,
@@ -359,16 +356,12 @@ export async function runLauncher(input: {
       stdio: ['pipe', 'pipe', 'pipe']
     })
   } catch (error) {
-    throw commandNotFoundError(command, error)
+    throw normalizeLauncherSpawnError(command, error)
   }
 
   const spawnError = await new Promise<Error | null>((resolve) => {
     child.on('error', (err) => {
-      if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-        resolve(commandNotFoundError(command, err))
-      } else {
-        resolve(err)
-      }
+      resolve(normalizeLauncherSpawnError(command, err))
     })
     child.on('spawn', () => resolve(null))
   })
@@ -400,6 +393,19 @@ export async function runLauncher(input: {
   const [exitCode, signal] = await once(child, 'close') as [number | null, string | null]
   clearTimeout(timeout)
   return { exitCode, signal }
+}
+
+export function normalizeLauncherSpawnError(command: string, error: unknown): Error {
+  const code = (error as NodeJS.ErrnoException | undefined)?.code
+  if (code === 'ENOENT') return commandNotFoundError(command, error)
+  if (code === 'E2BIG') {
+    const normalized = new Error(
+      `Cannot start '${command}': command arguments or environment exceed the operating system size limit.`
+    )
+    Object.assign(normalized, { cause: error, code })
+    return normalized
+  }
+  return error instanceof Error ? error : new Error(String(error))
 }
 
 function commandNotFoundError(command: string, cause: unknown): Error {
