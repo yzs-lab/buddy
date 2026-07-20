@@ -2,7 +2,7 @@
 
 import '@testing-library/jest-dom/vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Sidebar } from '../../../src/renderer/components/Sidebar'
 import type { Task } from '../../../src/shared/types'
@@ -219,7 +219,8 @@ describe('Sidebar', () => {
     const onOpenInVSCode = vi.fn()
     renderSidebar([task('first')], { onOpenInVSCode })
 
-    fireEvent.click(screen.getByTitle('More actions'))
+    const projectRow = screen.getByRole('button', { name: /repo/ })
+    fireEvent.click(within(projectRow).getByTitle('More actions'))
     fireEvent.click(screen.getByRole('button', { name: 'Open in VS Code' }))
 
     expect(onOpenInVSCode).toHaveBeenCalledOnce()
