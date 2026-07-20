@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { ChevronDown, ChevronUp, Wrench, Terminal, FilePen, FileText, Brain, FileCode2, File, FileJson, FileArchive, FileSpreadsheet, Image as ImageIcon, RotateCw } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Check, ChevronDown, ChevronUp, Copy, Wrench, Terminal, FilePen, FileText, Brain, FileCode2, File, FileJson, FileArchive, FileSpreadsheet, Image as ImageIcon, RotateCw } from 'lucide-react'
 import { AttachmentMeta, TranscriptEntry, RoundEventSummary, RoundEventEntry, TaskStats, TaskSettings } from '../../shared/types'
 import { renderMarkdown } from '../lib/markdown'
 import { formatDuration, formatTimeWithRelativeDate, decodeErrorText, unescapeText, ACTOR_LABEL_KEY, actorDisplayName } from '../lib/format'
@@ -206,6 +206,8 @@ function renderHealthCheckText(entry: TranscriptEntry, lang: ReturnType<typeof u
 export function MessageBubble({ entry, taskId, workspaceKey, taskSettings, onRetryHealthCheck, isRetryingHealthCheck }: MessageBubbleProps) {
   const t = useT()
   const lang = useLanguage()
+  const [copied, setCopied] = useState(false)
+  const copyResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isSystem = entry.role === 'system'
   const isHuman = entry.role === 'human'
   const meta = entry.meta || ({} as Record<string, unknown>)
@@ -250,12 +252,45 @@ export function MessageBubble({ entry, taskId, workspaceKey, taskSettings, onRet
   const isTaskDone = isRoundNotice && meta.done_reason === 'dual_break_confirmed'
   const taskDoneStats = isTaskDone ? (meta.stats as TaskStats | undefined) : undefined
 
+  useEffect(() => {
+    return () => {
+      if (copyResetTimer.current) clearTimeout(copyResetTimer.current)
+    }
+  }, [])
+
+  const handleCopyMarkdown = async () => {
+    try {
+      await navigator.clipboard.writeText(bodyText)
+      setCopied(true)
+      if (copyResetTimer.current) clearTimeout(copyResetTimer.current)
+      copyResetTimer.current = setTimeout(() => setCopied(false), 2000)
+    } catch {
+      setCopied(false)
+    }
+  }
+
+  const copyButton = (position: 'top' | 'bottom') => (
+    <button
+      type="button"
+      onClick={handleCopyMarkdown}
+      aria-label={copied ? t('message.copiedMarkdown') : t('message.copyMarkdown')}
+      title={copied ? t('message.copiedMarkdown') : t('message.copyMarkdown')}
+      data-copy-position={position}
+      className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-fg-muted transition-colors hover:bg-bg-muted hover:text-fg cursor-pointer"
+    >
+      {copied ? <Check size={14} strokeWidth={2} /> : <Copy size={14} strokeWidth={2} />}
+    </button>
+  )
+
   return (
     <div className={`flex mb-3 ${isHuman ? 'justify-end' : 'justify-start'}`}>
       <div className={`message ${cls} ${noticeClass} ${isHuman ? 'min-w-[66.666667%] max-w-[82%]' : 'w-full'}`}>
         <div className="message-head">
           <span className="role">{roleLabel}</span>
-          {metaText && <span>{metaText}</span>}
+          <div className="flex items-center gap-2">
+            {metaText && <span>{metaText}</span>}
+            {copyButton('top')}
+          </div>
         </div>
         {displayAttachments && displayAttachments.length > 0 && (
           <AttachmentPreviews attachments={displayAttachments} />
@@ -284,6 +319,9 @@ export function MessageBubble({ entry, taskId, workspaceKey, taskSettings, onRet
         {taskDoneStats ? (
           <TaskDoneStats stats={taskDoneStats} taskSettings={taskSettings} />
         ) : null}
+        <div className="mt-2 flex justify-end">
+          {copyButton('bottom')}
+        </div>
       </div>
     </div>
   )
