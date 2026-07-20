@@ -86,6 +86,7 @@ test('auto-skips a running countdown once when its deadline elapses', async ({ p
       value: {
         selectDirectory: async () => null,
         openInFinder: async () => undefined,
+        openInVSCode: async () => undefined,
         onFullScreenChange: () => () => undefined,
         isFullScreen: async () => false,
         updateMenuLanguage: () => undefined,

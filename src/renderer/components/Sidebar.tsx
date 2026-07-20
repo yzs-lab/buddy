@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import {
   ChevronLeft,
+  Code2,
   Ellipsis,
   Folder,
   FolderOpen,
@@ -62,6 +63,7 @@ interface SidebarProps {
   onRenameProject: (repoRoot: string, newName: string) => void
   onRenameTask: (taskId: string, newName: string) => void
   onOpenInFinder: (path: string) => void
+  onOpenInVSCode: (path: string) => void
   onRemoveProject: (repoRoot: string) => void
   projectNames: Record<string, string>
   taskNames: Record<string, string>
@@ -92,6 +94,7 @@ export function Sidebar({
   onRenameProject,
   onRenameTask,
   onOpenInFinder,
+  onOpenInVSCode,
   onRemoveProject,
   projectNames,
   taskNames
@@ -141,6 +144,7 @@ export function Sidebar({
           onRenameProject={onRenameProject}
           onRenameTask={onRenameTask}
           onOpenInFinder={onOpenInFinder}
+          onOpenInVSCode={onOpenInVSCode}
           onRemoveProject={onRemoveProject}
           projectNames={projectNames}
           taskNames={taskNames}
@@ -244,6 +248,7 @@ function ChatSidebar({
   onRenameProject,
   onRenameTask,
   onOpenInFinder,
+  onOpenInVSCode,
   onRemoveProject,
   projectNames,
   taskNames,
@@ -264,6 +269,7 @@ function ChatSidebar({
   onRenameProject: (repoRoot: string, newName: string) => void
   onRenameTask: (taskId: string, newName: string) => void
   onOpenInFinder: (path: string) => void
+  onOpenInVSCode: (path: string) => void
   onRemoveProject: (repoRoot: string) => void
   projectNames: Record<string, string>
   taskNames: Record<string, string>
@@ -574,6 +580,14 @@ function ChatSidebar({
                           >
                             <FolderOpen size={13} strokeWidth={2} />
                             {t('sidebar.menuOpenInFinder')}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setOpenMenuRepoRoot(null); onOpenInVSCode(repoRoot) }}
+                            className="w-full flex items-center gap-2 px-3 py-[3px] text-fg hover:bg-bg-muted rounded-[4px] mx-0.5"
+                          >
+                            <Code2 size={13} strokeWidth={2} />
+                            {t('sidebar.menuOpenInVSCode')}
                           </button>
                           <div className="my-0.5 border-t border-border-subtle" />
                           <button

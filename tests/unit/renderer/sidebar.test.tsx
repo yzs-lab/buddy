@@ -2,7 +2,7 @@
 
 import '@testing-library/jest-dom/vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Sidebar } from '../../../src/renderer/components/Sidebar'
 import type { Task } from '../../../src/shared/types'
@@ -60,9 +60,12 @@ describe('Sidebar', () => {
       onToggleSidebar: vi.fn(),
       isFullScreen: false,
       onRenameProject: vi.fn(),
+      onRenameTask: vi.fn(),
       onOpenInFinder: vi.fn(),
+      onOpenInVSCode: vi.fn(),
       onRemoveProject: vi.fn(),
       projectNames: {},
+      taskNames: {},
       ...overrides
     }
 
@@ -102,9 +105,12 @@ describe('Sidebar', () => {
         onToggleSidebar={() => {}}
         isFullScreen={false}
         onRenameProject={() => {}}
+        onRenameTask={() => {}}
         onOpenInFinder={() => {}}
+        onOpenInVSCode={() => {}}
         onRemoveProject={() => {}}
         projectNames={{}}
+        taskNames={{}}
       />
     )
 
@@ -151,9 +157,12 @@ describe('Sidebar', () => {
         onToggleSidebar={() => {}}
         isFullScreen={false}
         onRenameProject={() => {}}
+        onRenameTask={() => {}}
         onOpenInFinder={() => {}}
+        onOpenInVSCode={() => {}}
         onRemoveProject={() => {}}
         projectNames={{}}
+        taskNames={{}}
       />
     )
 
@@ -204,6 +213,19 @@ describe('Sidebar', () => {
     expect(props.onCreateTask).toHaveBeenCalledWith('/tmp/repo')
     expect(projectRow).toHaveAttribute('aria-expanded', 'false')
     expect(screen.queryByText('second')).toBeNull()
+  })
+
+  it('opens the project path in VS Code from the project menu', () => {
+    const onOpenInVSCode = vi.fn()
+    renderSidebar([task('first')], { onOpenInVSCode })
+
+    const projectRow = screen.getByRole('button', { name: /repo/ })
+    fireEvent.click(within(projectRow).getByTitle('More actions'))
+    fireEvent.click(screen.getByRole('button', { name: 'Open in VS Code' }))
+
+    expect(onOpenInVSCode).toHaveBeenCalledOnce()
+    expect(onOpenInVSCode).toHaveBeenCalledWith('/tmp/repo')
+    expect(screen.queryByRole('button', { name: 'Open in VS Code' })).toBeNull()
   })
 
   it('allows the selected task project to stay collapsed when the project was persisted collapsed', () => {
