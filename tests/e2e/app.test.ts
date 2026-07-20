@@ -28,6 +28,7 @@ test.beforeEach(async ({ page }) => {
     const api = {
       selectDirectory: async () => null,
       openInFinder: async () => undefined,
+      openInVSCode: async () => undefined,
       onFullScreenChange: () => () => undefined,
       isFullScreen: async () => false,
       updateMenuLanguage: () => undefined,

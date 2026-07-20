@@ -25,6 +25,7 @@ import { initUpdater, checkForUpdates, downloadUpdate, quitAndInstall, setUpdate
 import { mkdir, writeFile, stat, readFile, realpath } from 'node:fs/promises'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
+import { openInVSCode } from './open-in-vscode'
 
 fixShellPath()
 
@@ -83,6 +84,10 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('shell:openInFinder', async (_event, path: string) => {
     await shell.openPath(path)
+  })
+
+  ipcMain.handle('shell:openInVSCode', async (_event, path: string) => {
+    await openInVSCode(path)
   })
 
   ipcMain.handle('shell:openExternal', async (_event, url: string) => {

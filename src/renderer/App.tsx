@@ -200,6 +200,12 @@ export default function App() {
     })
   }, [])
 
+  const handleOpenInVSCode = useCallback((path: string) => {
+    window.api.openInVSCode(path).catch((err: unknown) => {
+      console.error('Failed to open in VS Code:', err)
+    })
+  }, [])
+
   const handleRemoveProject = useCallback(async (repoRoot: string) => {
     const projectTasks = tasks.filter(t => t.repo_root === repoRoot)
     for (const task of projectTasks) {
@@ -645,6 +651,7 @@ export default function App() {
         onRenameProject={handleRenameProject}
         onRenameTask={handleRenameTask}
         onOpenInFinder={handleOpenInFinder}
+        onOpenInVSCode={handleOpenInVSCode}
         onRemoveProject={handleRemoveProject}
         projectNames={projectNames}
         taskNames={taskNames}

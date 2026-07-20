@@ -6,6 +6,8 @@ const api = {
     ipcRenderer.invoke('dialog:selectDirectory', defaultPath),
   openInFinder: (path: string): Promise<void> =>
     ipcRenderer.invoke('shell:openInFinder', path),
+  openInVSCode: (path: string): Promise<void> =>
+    ipcRenderer.invoke('shell:openInVSCode', path),
   openExternal: (url: string): Promise<void> =>
     ipcRenderer.invoke('shell:openExternal', url),
   onFullScreenChange: (callback: (isFullScreen: boolean) => void): (() => void) => {

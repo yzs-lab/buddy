@@ -82,6 +82,7 @@ test.beforeEach(async ({ page }) => {
       value: {
         selectDirectory: async () => null,
         openInFinder: async () => undefined,
+        openInVSCode: async () => undefined,
         onFullScreenChange: () => () => undefined,
         isFullScreen: async () => false,
         updateMenuLanguage: () => undefined,
