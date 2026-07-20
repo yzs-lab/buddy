@@ -57,6 +57,8 @@ const en = {
   'common.idle': 'Idle',
   'common.required': 'Required',
   'common.copy': 'Copy',
+  'message.copyMarkdown': 'Copy message as Markdown',
+  'message.copiedMarkdown': 'Markdown copied',
   'common.select': 'Select',
 
   // App / branding
@@ -510,6 +512,8 @@ const zhCN: typeof en = {
   'common.idle': '空闲',
   'common.required': '必填',
   'common.copy': '复制',
+  'message.copyMarkdown': '复制消息的 Markdown',
+  'message.copiedMarkdown': 'Markdown 已复制',
   'common.select': '选择',
 
   'app.brand': 'Buddy',
@@ -942,6 +946,8 @@ const zhTW: typeof en = {
   'common.idle': '閒置',
   'common.required': '必填',
   'common.copy': '複製',
+  'message.copyMarkdown': '複製訊息的 Markdown',
+  'message.copiedMarkdown': 'Markdown 已複製',
   'common.select': '選擇',
 
   'app.brand': 'Buddy',
