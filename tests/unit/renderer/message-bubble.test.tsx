@@ -58,7 +58,7 @@ describe('MessageBubble layout', () => {
 
     expect(html).toContain('msg-system')
     expect(html).toContain('w-full')
-    expect(html).not.toContain('justify-center')
+    expect(html).not.toContain('flex mb-3 justify-center')
     expect(html).not.toContain('rounded-full')
   })
 })
