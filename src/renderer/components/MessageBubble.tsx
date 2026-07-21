@@ -291,36 +291,6 @@ export function MessageBubble({ entry, taskId, workspaceKey, taskSettings, onRet
     </button>
   )
 
-  useEffect(() => {
-    return () => {
-      if (copyResetTimer.current) clearTimeout(copyResetTimer.current)
-    }
-  }, [])
-
-  const handleCopyMarkdown = async () => {
-    try {
-      await navigator.clipboard.writeText(bodyText)
-      setCopied(true)
-      if (copyResetTimer.current) clearTimeout(copyResetTimer.current)
-      copyResetTimer.current = setTimeout(() => setCopied(false), 2000)
-    } catch {
-      setCopied(false)
-    }
-  }
-
-  const copyButton = (position: 'top' | 'bottom') => (
-    <button
-      type="button"
-      onClick={handleCopyMarkdown}
-      aria-label={copied ? t('message.copiedMarkdown') : t('message.copyMarkdown')}
-      title={copied ? t('message.copiedMarkdown') : t('message.copyMarkdown')}
-      data-copy-position={position}
-      className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-fg-muted transition-colors hover:bg-bg-muted hover:text-fg cursor-pointer"
-    >
-      {copied ? <Check size={14} strokeWidth={2} /> : <Copy size={14} strokeWidth={2} />}
-    </button>
-  )
-
   return (
     <div className={`flex mb-3 ${isHuman ? 'justify-end' : 'justify-start'}`}>
       <div className={`message ${cls} ${noticeClass} ${isHuman ? 'min-w-[66.666667%] max-w-[82%]' : 'w-full'}`}>
