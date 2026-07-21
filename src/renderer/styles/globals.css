@@ -397,10 +397,23 @@ body {
 }
 
 /* ===== Round Events ===== */
-.round-events-section {
+.message-footer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
   margin-top: 8px;
   border-top: 1px solid var(--border);
   padding-top: 6px;
+}
+.message-footer-copy-only {
+  justify-content: flex-end;
+  border-top: 0;
+  padding-top: 0;
+}
+.round-events-section {
+  flex: 1;
+  min-width: 0;
 }
 .round-events-toggle {
   display: inline-flex;
