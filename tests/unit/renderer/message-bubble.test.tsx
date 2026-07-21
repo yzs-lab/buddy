@@ -1,7 +1,24 @@
+// @vitest-environment jsdom
+
+import '@testing-library/jest-dom/vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it } from 'vitest'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MessageBubble } from '../../../src/renderer/components/MessageBubble'
 import type { TranscriptEntry } from '../../../src/shared/types'
+
+vi.mock('../../../src/renderer/hooks/useBuddy', () => ({
+  useRoundEvents: () => ({
+    data: {
+      runId: 'run-1',
+      events: [],
+      inputTokens: 12,
+      outputTokens: 4,
+      cacheReadTokens: 0
+    },
+    isLoading: false
+  })
+}))
 
 function transcriptEntry(role: TranscriptEntry['role'], content = 'Short message'): TranscriptEntry {
   return {
@@ -10,6 +27,22 @@ function transcriptEntry(role: TranscriptEntry['role'], content = 'Short message
     ts: '2026-05-26T07:30:00.000Z'
   }
 }
+
+let writeText: ReturnType<typeof vi.fn>
+
+beforeEach(() => {
+  writeText = vi.fn().mockResolvedValue(undefined)
+  Object.defineProperty(navigator, 'clipboard', {
+    configurable: true,
+    value: { writeText }
+  })
+  window.localStorage.setItem('buddy.language', 'en')
+})
+
+afterEach(() => {
+  cleanup()
+  window.localStorage.clear()
+})
 
 describe('MessageBubble layout', () => {
   it('gives human message cards a minimum width of two thirds', () => {
@@ -38,7 +71,44 @@ describe('MessageBubble layout', () => {
 
     expect(html).toContain('msg-system')
     expect(html).toContain('w-full')
-    expect(html).not.toContain('justify-center')
+    expect(html).not.toContain('flex mb-3 justify-center')
     expect(html).not.toContain('rounded-full')
+  })
+})
+
+describe('MessageBubble Markdown copy controls', () => {
+  it('keeps the bottom copy icon on the details row and copies the Markdown source', async () => {
+    const markdown = '# Result\n\n- first\n- second\n\n```ts\nconst ready = true\n```'
+    const entry = {
+      ...transcriptEntry('codex', markdown),
+      meta: { run_id: 'run-1' }
+    }
+    const { container } = render(
+      <MessageBubble entry={entry} taskId="task-1" workspaceKey="workspace-1" />
+    )
+
+    const copyButtons = screen.getAllByRole('button', { name: 'Copy message as Markdown' })
+    expect(copyButtons).toHaveLength(2)
+    expect(copyButtons[0]).toHaveAttribute('data-copy-position', 'top')
+    expect(copyButtons[0]).toHaveClass('cursor-pointer')
+    expect(copyButtons[0].closest('.message-head')).not.toBeNull()
+    expect(copyButtons[1]).toHaveAttribute('data-copy-position', 'bottom')
+    const footer = container.querySelector('.message-footer')
+    const detailsButton = screen.getByRole('button', { name: 'Details' })
+    expect(footer).not.toHaveClass('message-footer-copy-only')
+    expect(footer).toContainElement(detailsButton)
+    expect(footer).toContainElement(copyButtons[1])
+    expect(detailsButton.closest('.round-events-section')?.parentElement).toBe(footer)
+    expect(copyButtons[1].parentElement).toBe(footer)
+
+    fireEvent.click(copyButtons[0])
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(markdown))
+    const copiedButtons = screen.getAllByRole('button', { name: 'Markdown copied' })
+    expect(copiedButtons).toHaveLength(2)
+
+    fireEvent.click(copiedButtons[1])
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(2))
+    expect(writeText).toHaveBeenLastCalledWith(markdown)
   })
 })
