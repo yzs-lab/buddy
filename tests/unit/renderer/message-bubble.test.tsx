@@ -7,6 +7,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MessageBubble } from '../../../src/renderer/components/MessageBubble'
 import type { TranscriptEntry } from '../../../src/shared/types'
 
+vi.mock('../../../src/renderer/hooks/useBuddy', () => ({
+  useRoundEvents: () => ({
+    data: {
+      runId: 'run-1',
+      events: [],
+      inputTokens: 12,
+      outputTokens: 4,
+      cacheReadTokens: 0
+    },
+    isLoading: false
+  })
+}))
+
 function transcriptEntry(role: TranscriptEntry['role'], content = 'Short message'): TranscriptEntry {
   return {
     role,
@@ -64,10 +77,14 @@ describe('MessageBubble layout', () => {
 })
 
 describe('MessageBubble Markdown copy controls', () => {
-  it('places copy icons at both right-side positions and copies the Markdown source', async () => {
+  it('keeps the bottom copy icon on the details row and copies the Markdown source', async () => {
     const markdown = '# Result\n\n- first\n- second\n\n```ts\nconst ready = true\n```'
+    const entry = {
+      ...transcriptEntry('codex', markdown),
+      meta: { run_id: 'run-1' }
+    }
     const { container } = render(
-      <MessageBubble entry={transcriptEntry('codex', markdown)} />
+      <MessageBubble entry={entry} taskId="task-1" workspaceKey="workspace-1" />
     )
 
     const copyButtons = screen.getAllByRole('button', { name: 'Copy message as Markdown' })
@@ -76,7 +93,13 @@ describe('MessageBubble Markdown copy controls', () => {
     expect(copyButtons[0]).toHaveClass('cursor-pointer')
     expect(copyButtons[0].closest('.message-head')).not.toBeNull()
     expect(copyButtons[1]).toHaveAttribute('data-copy-position', 'bottom')
-    expect(container.querySelector('.message > div:last-child')).toContainElement(copyButtons[1])
+    const footer = container.querySelector('.message-footer')
+    const detailsButton = screen.getByRole('button', { name: 'Details' })
+    expect(footer).not.toHaveClass('message-footer-copy-only')
+    expect(footer).toContainElement(detailsButton)
+    expect(footer).toContainElement(copyButtons[1])
+    expect(detailsButton.closest('.round-events-section')?.parentElement).toBe(footer)
+    expect(copyButtons[1].parentElement).toBe(footer)
 
     fireEvent.click(copyButtons[0])
 

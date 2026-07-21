@@ -251,6 +251,15 @@ export function MessageBubble({ entry, taskId, workspaceKey, taskSettings, onRet
   const noticeClass = isRoundNotice ? 'round-notice' : isHealthCheckFailed ? 'health-check-failed' : isHealthCheck ? 'health-check' : ''
   const isTaskDone = isRoundNotice && meta.done_reason === 'dual_break_confirmed'
   const taskDoneStats = isTaskDone ? (meta.stats as TaskStats | undefined) : undefined
+  const roundEventsProps = runId && !isHuman && !isSystem && taskId && workspaceKey
+    ? {
+        taskId,
+        runId,
+        workspaceKey,
+        actor: entry.role,
+        elapsedMs: meta.elapsed_ms as number | undefined
+      }
+    : null
 
   useEffect(() => {
     return () => {
@@ -313,13 +322,11 @@ export function MessageBubble({ entry, taskId, workspaceKey, taskSettings, onRet
             </button>
           </div>
         )}
-        {runId && !isHuman && !isSystem && taskId && workspaceKey && (
-          <RoundEvents taskId={taskId} runId={runId} workspaceKey={workspaceKey} actor={entry.role} elapsedMs={meta.elapsed_ms as number | undefined} />
-        )}
         {taskDoneStats ? (
           <TaskDoneStats stats={taskDoneStats} taskSettings={taskSettings} />
         ) : null}
-        <div className="mt-2 flex justify-end">
+        <div className={`message-footer ${roundEventsProps ? '' : 'message-footer-copy-only'}`}>
+          {roundEventsProps && <RoundEvents {...roundEventsProps} />}
           {copyButton('bottom')}
         </div>
       </div>
